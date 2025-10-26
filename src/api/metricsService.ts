@@ -279,3 +279,8 @@ export async function getMetricsDataSimple(days: number = 1) {
 export async function getMetricsDataWithDateRange(startDate: string, endDate: string) {
   return makeRequest('/api/metrics-data', { startDate, endDate });
 }
+
+// AI Query function
+export async function queryAI(query: string) {
+  return makeRequest('/api/ai-query', { query }, 'POST');
+}

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ChevronUp, ChevronDown, RefreshCw, Calendar } from 'lucide-react';
+import { ChevronUp, ChevronDown, RefreshCw, Calendar, MessageSquare, Send, Loader2 } from 'lucide-react';
 
 interface MetricRow {
   userId: string;
@@ -24,6 +24,17 @@ interface MetricsData {
 type SortColumn = 'name' | 'dial' | 'connect' | 'pitch' | 'conversation' | 'meeting';
 type SortDirection = 'asc' | 'desc';
 
+interface AIQueryResponse {
+  query: string;
+  dateRange: {
+    start: string;
+    end: string;
+  };
+  intent: string;
+  answer: string;
+  dataUsed: MetricsData;
+}
+
 function App() {
   const [data, setData] = useState<MetricsData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -33,6 +44,12 @@ function App() {
   const [endDate, setEndDate] = useState('');
   const [sortColumn, setSortColumn] = useState<SortColumn>('name');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
+  
+  // AI Query states
+  const [aiQuery, setAiQuery] = useState('');
+  const [aiResponse, setAiResponse] = useState<AIQueryResponse | null>(null);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
 
   const fetchMetrics = async (customStart?: string, customEnd?: string) => {
     setLoading(true);
@@ -71,6 +88,29 @@ function App() {
     const startDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
     
     fetchMetrics(startDate.toISOString().split('T')[0], endDate.toISOString().split('T')[0]);
+  };
+
+  const handleAIQuery = async () => {
+    if (!aiQuery.trim()) return;
+    
+    setAiLoading(true);
+    setAiError(null);
+    setAiResponse(null);
+    
+    try {
+      const { queryAI } = await import('./api/metricsService');
+      const response = await queryAI(aiQuery);
+      setAiResponse(response);
+    } catch (err) {
+      setAiError(err instanceof Error ? err.message : 'Failed to process AI query');
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
+  const handleAIQuerySubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    handleAIQuery();
   };
 
   const handleSort = (column: SortColumn) => {
@@ -260,6 +300,111 @@ function App() {
               </div>
             )}
           </div>
+        </div>
+
+        {/* AI Query Section */}
+        <div className="bg-white rounded-lg border border-slate-200 p-6 mb-6">
+          <div className="flex items-center gap-3 mb-4">
+            <MessageSquare className="w-5 h-5 text-blue-600" />
+            <h2 className="text-lg font-semibold text-slate-900">Ask AI about your metrics</h2>
+          </div>
+          
+          <form onSubmit={handleAIQuerySubmit} className="space-y-4">
+            <div className="flex gap-3">
+              <input
+                type="text"
+                value={aiQuery}
+                onChange={(e) => setAiQuery(e.target.value)}
+                placeholder="Ask anything about your metrics... e.g., 'Who made the most dials last week?' or 'Show me top performers this month'"
+                className="flex-1 px-4 py-3 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                disabled={aiLoading}
+              />
+              <button
+                type="submit"
+                disabled={aiLoading || !aiQuery.trim()}
+                className="px-6 py-3 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:bg-slate-300 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+              >
+                {aiLoading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Processing...
+                  </>
+                ) : (
+                  <>
+                    <Send className="w-4 h-4" />
+                    Ask AI
+                  </>
+                )}
+              </button>
+            </div>
+          </form>
+
+          {aiError && (
+            <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+              <p className="text-red-700 text-sm">{aiError}</p>
+            </div>
+          )}
+
+          {aiResponse && (
+            <div className="mt-6 space-y-4">
+              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-6 shadow-sm">
+                <div className="flex items-start gap-4">
+                  <div className="flex-shrink-0 w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                    <MessageSquare className="w-5 h-5 text-blue-600" />
+                  </div>
+                  <div className="flex-1 space-y-4">
+                    {/* Query Header */}
+                    <div className="bg-white rounded-lg p-4 border border-blue-100">
+                      <div className="text-sm font-medium text-blue-800 mb-1">
+                        💬 Your Question
+                      </div>
+                      <div className="text-base text-slate-800 font-medium">
+                        "{aiResponse.query}"
+                      </div>
+                    </div>
+
+                    {/* Metadata */}
+                    <div className="flex flex-wrap gap-3 text-xs">
+                      <div className="bg-white px-3 py-1 rounded-full border border-blue-100">
+                        📅 {aiResponse.dateRange.start} to {aiResponse.dateRange.end}
+                      </div>
+                      <div className="bg-white px-3 py-1 rounded-full border border-blue-100">
+                        🎯 {aiResponse.intent}
+                      </div>
+                    </div>
+
+                    {/* AI Answer */}
+                    <div className="bg-white rounded-lg p-4 border border-blue-100">
+                      <div className="text-sm font-medium text-blue-800 mb-3 flex items-center gap-2">
+                        🤖 AI Analysis
+                      </div>
+                      <div className="text-sm text-slate-700 leading-relaxed space-y-2">
+                        {typeof aiResponse.answer === 'string' 
+                          ? aiResponse.answer.split('\n').map((line, lineIndex) => (
+                              <div key={lineIndex}>
+                                {line.split(/(\*\*.*?\*\*)/).map((part, partIndex) => {
+                                  if (part.startsWith('**') && part.endsWith('**')) {
+                                    return (
+                                      <span key={partIndex} className="font-semibold text-slate-900 bg-yellow-100 px-1 rounded">
+                                        {part.slice(2, -2)}
+                                      </span>
+                                    );
+                                  }
+                                  return <span key={partIndex}>{part}</span>;
+                                })}
+                              </div>
+                            ))
+                          : <pre className="text-xs bg-slate-50 p-3 rounded overflow-auto">
+                              {JSON.stringify(aiResponse.answer, null, 2)}
+                            </pre>
+                        }
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden">

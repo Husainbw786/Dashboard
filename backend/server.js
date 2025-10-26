@@ -1,7 +1,12 @@
 import express from 'express';
 import cors from 'cors';
 import https from 'https';
+import OpenAI from 'openai';
+import dotenv from 'dotenv';
 import { getMetricsData, getMetricsDataWithDates } from './api-server.js';
+
+// Load environment variables
+dotenv.config();
 
 const app = express();
 const PORT = 3001;
@@ -15,6 +20,11 @@ const CONFIG = {
   HOSTNAME: 'api.trellus.ai',
   TEAM_ID: null,
 };
+
+// Initialize OpenAI client
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY
+});
 
 const ENDPOINTS = {
   GET_VISIBLE_ACCOUNTS: 'get-visible-accounts',
@@ -147,6 +157,135 @@ app.get('/api/metrics-data', async (req, res) => {
     res.json(data);
   } catch (error) {
     console.error('Error getting metrics data:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// AI Query endpoint
+app.post('/api/ai-query', async (req, res) => {
+  try {
+    const { query } = req.body;
+    
+    if (!query) {
+      return res.status(400).json({ error: 'Query is required' });
+    }
+
+    // Step 1: Ask OpenAI to extract date range and intent from the query
+    const dateExtractionPrompt = `
+You are a helpful assistant that extracts date ranges and intent from natural language queries about sales metrics.
+
+The user query is: "${query}"
+
+Current date is: ${new Date().toISOString().split('T')[0]}
+
+IMPORTANT: You must respond with ONLY a valid JSON object, no additional text, explanations, or formatting.
+
+Please analyze the query and respond with a JSON object containing:
+1. "startDate": The start date in YYYY-MM-DD format
+2. "endDate": The end date in YYYY-MM-DD format  
+3. "intent": A brief description of what the user wants to know
+
+For time periods like:
+- "today" = current date to current date
+- "yesterday" = previous date to previous date
+- "last 7 days" = 7 days ago to today
+- "last month" = 30 days ago to today
+- "last week" = 7 days ago to today
+
+Example response (respond exactly like this format):
+{"startDate": "2025-10-01", "endDate": "2025-10-26", "intent": "Find the person with the highest number of dials"}
+`;
+
+    const dateResponse = await openai.chat.completions.create({
+      model: "gpt-4o",
+      messages: [{ role: "user", content: dateExtractionPrompt }],
+      temperature: 0.1,
+      response_format: { type: "json_object" }
+    });
+
+    let dateInfo;
+    try {
+      const aiResponse = dateResponse.choices[0].message.content;
+      console.log('AI Date Response:', aiResponse); // Debug log
+      
+      // Try to extract JSON from the response if it contains extra text
+      let jsonStr = aiResponse;
+      const jsonMatch = aiResponse.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        jsonStr = jsonMatch[0];
+      }
+      
+      dateInfo = JSON.parse(jsonStr);
+    } catch (e) {
+      console.error('Failed to parse AI response:', dateResponse.choices[0].message.content);
+      return res.status(500).json({ 
+        error: 'Failed to parse date information from AI',
+        aiResponse: dateResponse.choices[0].message.content 
+      });
+    }
+
+    // Step 2: Fetch metrics data for the extracted date range
+    const metricsData = await getMetricsDataWithDates(
+      new Date(dateInfo.startDate), 
+      new Date(dateInfo.endDate)
+    );
+
+    // Step 3: Ask OpenAI to analyze the data and provide an answer
+    const analysisPrompt = `
+You are a helpful assistant analyzing sales metrics data. 
+
+User Query: "${query}"
+Intent: ${dateInfo.intent}
+Date Range: ${dateInfo.startDate} to ${dateInfo.endDate}
+
+Here is the metrics data:
+${JSON.stringify(metricsData, null, 2)}
+
+The data contains:
+- userName: Name of the sales person
+- Dial: Number of calls made
+- Connect: Number of calls connected
+- Pitch: Number of pitches given
+- Conversation: Number of conversations held
+- Meeting: Number of meetings scheduled
+
+Please analyze this data and provide a clear, conversational answer to the user's query. 
+
+IMPORTANT: Respond with a natural, conversational text answer only. Do NOT return JSON or structured data.
+
+Guidelines:
+- Use **bold** formatting for names and important numbers
+- Be specific with numbers and names
+- Provide context and insights
+- Keep it conversational and easy to understand
+- If asked for rankings, mention the top 3-5 performers
+- Include relevant comparisons or insights
+
+Example response format:
+"Based on the data for [date range], **[Name]** has the highest number of dials with **[number] dials**. This is significantly higher than the next performer, showing exceptional activity during this period."
+`;
+
+    const analysisResponse = await openai.chat.completions.create({
+      model: "gpt-4o",
+      messages: [{ role: "user", content: analysisPrompt }],
+      temperature: 0.3,
+    });
+
+    const answer = analysisResponse.choices[0].message.content;
+
+    res.json({
+      query,
+      dateRange: {
+        start: dateInfo.startDate,
+        end: dateInfo.endDate
+      },
+      intent: dateInfo.intent,
+      answer,
+      dataUsed: metricsData
+    });
+
+  } catch (error) {
+    console.error('Error processing AI query:', error);
     res.status(500).json({ error: error.message });
   }
 });
