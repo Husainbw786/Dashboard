@@ -21,6 +21,9 @@ interface MetricsData {
   };
 }
 
+type SortColumn = 'name' | 'dial' | 'connect' | 'pitch' | 'conversation' | 'meeting';
+type SortDirection = 'asc' | 'desc';
+
 function App() {
   const [data, setData] = useState<MetricsData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -28,6 +31,8 @@ function App() {
   const [useCustomDates, setUseCustomDates] = useState(false);
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [sortColumn, setSortColumn] = useState<SortColumn>('name');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
 
   const fetchMetrics = async (customStart?: string, customEnd?: string) => {
     setLoading(true);
@@ -66,6 +71,61 @@ function App() {
     const startDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
     
     fetchMetrics(startDate.toISOString().split('T')[0], endDate.toISOString().split('T')[0]);
+  };
+
+  const handleSort = (column: SortColumn) => {
+    if (sortColumn === column) {
+      // Toggle direction if same column
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      // New column, default to descending for numeric columns, ascending for name
+      setSortColumn(column);
+      setSortDirection(column === 'name' ? 'asc' : 'desc');
+    }
+  };
+
+  const getSortedData = () => {
+    if (!data) return [];
+    
+    const sortedRows = [...data.rows].sort((a, b) => {
+      let aValue: string | number;
+      let bValue: string | number;
+      
+      switch (sortColumn) {
+        case 'name':
+          aValue = a.userName.toLowerCase();
+          bValue = b.userName.toLowerCase();
+          break;
+        case 'dial':
+          aValue = a.values.Dial;
+          bValue = b.values.Dial;
+          break;
+        case 'connect':
+          aValue = a.values.Connect;
+          bValue = b.values.Connect;
+          break;
+        case 'pitch':
+          aValue = a.values.Pitch;
+          bValue = b.values.Pitch;
+          break;
+        case 'conversation':
+          aValue = a.values.Conversation;
+          bValue = b.values.Conversation;
+          break;
+        case 'meeting':
+          aValue = a.values.Meeting;
+          bValue = b.values.Meeting;
+          break;
+        default:
+          return 0;
+      }
+      
+      if (aValue < bValue) return sortDirection === 'asc' ? -1 : 1;
+      if (aValue > bValue) return sortDirection === 'asc' ? 1 : -1;
+      return 0;
+    });
+    
+    return sortedRows;
   };
 
   useEffect(() => {
@@ -208,41 +268,99 @@ function App() {
               <thead>
                 <tr className="bg-slate-50 border-b border-slate-200">
                   <th className="text-left px-6 py-4">
-                    <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => handleSort('name')}
+                      className="flex items-center gap-2 hover:text-slate-700 transition-colors"
+                    >
                       <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
                         Name
                       </span>
-                    </div>
+                      {sortColumn === 'name' && (
+                        sortDirection === 'asc' ? 
+                          <ChevronUp className="w-3 h-3" /> : 
+                          <ChevronDown className="w-3 h-3" />
+                      )}
+                    </button>
                   </th>
                   <th className="text-right px-6 py-4">
-                    <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                      Dial
-                    </span>
+                    <button
+                      onClick={() => handleSort('dial')}
+                      className="flex items-center gap-2 ml-auto hover:text-slate-700 transition-colors"
+                    >
+                      <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                        Dial
+                      </span>
+                      {sortColumn === 'dial' && (
+                        sortDirection === 'asc' ? 
+                          <ChevronUp className="w-3 h-3" /> : 
+                          <ChevronDown className="w-3 h-3" />
+                      )}
+                    </button>
                   </th>
                   <th className="text-right px-6 py-4">
-                    <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                      Connect
-                    </span>
+                    <button
+                      onClick={() => handleSort('connect')}
+                      className="flex items-center gap-2 ml-auto hover:text-slate-700 transition-colors"
+                    >
+                      <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                        Connect
+                      </span>
+                      {sortColumn === 'connect' && (
+                        sortDirection === 'asc' ? 
+                          <ChevronUp className="w-3 h-3" /> : 
+                          <ChevronDown className="w-3 h-3" />
+                      )}
+                    </button>
                   </th>
                   <th className="text-right px-6 py-4">
-                    <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                      Pitch
-                    </span>
+                    <button
+                      onClick={() => handleSort('pitch')}
+                      className="flex items-center gap-2 ml-auto hover:text-slate-700 transition-colors"
+                    >
+                      <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                        Pitch
+                      </span>
+                      {sortColumn === 'pitch' && (
+                        sortDirection === 'asc' ? 
+                          <ChevronUp className="w-3 h-3" /> : 
+                          <ChevronDown className="w-3 h-3" />
+                      )}
+                    </button>
                   </th>
                   <th className="text-right px-6 py-4">
-                    <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                      Conv
-                    </span>
+                    <button
+                      onClick={() => handleSort('conversation')}
+                      className="flex items-center gap-2 ml-auto hover:text-slate-700 transition-colors"
+                    >
+                      <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                        Conv
+                      </span>
+                      {sortColumn === 'conversation' && (
+                        sortDirection === 'asc' ? 
+                          <ChevronUp className="w-3 h-3" /> : 
+                          <ChevronDown className="w-3 h-3" />
+                      )}
+                    </button>
                   </th>
                   <th className="text-right px-6 py-4">
-                    <span className="text-xs font-semibold text-orange-500 uppercase tracking-wider">
-                      Meet
-                    </span>
+                    <button
+                      onClick={() => handleSort('meeting')}
+                      className="flex items-center gap-2 ml-auto hover:text-slate-700 transition-colors"
+                    >
+                      <span className="text-xs font-semibold text-orange-500 uppercase tracking-wider">
+                        Meet
+                      </span>
+                      {sortColumn === 'meeting' && (
+                        sortDirection === 'asc' ? 
+                          <ChevronUp className="w-3 h-3" /> : 
+                          <ChevronDown className="w-3 h-3" />
+                      )}
+                    </button>
                   </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {data.rows.map((row, index) => {
+                {getSortedData().map((row, index) => {
                   const hasActivity = row.values.Dial > 0;
 
                   return (
@@ -318,7 +436,7 @@ function App() {
         </div>
 
         <div className="mt-4 text-center text-xs text-slate-500">
-          Showing {data.rows.length} users
+          Showing {getSortedData().length} users
         </div>
       </div>
     </div>
