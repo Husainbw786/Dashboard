@@ -263,8 +263,8 @@ Example response (respond exactly like this format):
       });
     }
 
-    // Step 2: Fetch metrics data for the extracted date range
-    const metricsData = await getMetricsDataWithDates(
+    // Step 2: Fetch enhanced metrics data (including meeting integration) for the extracted date range
+    const metricsData = await getMetricsDataWithMeetings(
       new Date(dateInfo.startDate), 
       new Date(dateInfo.endDate)
     );
@@ -286,7 +286,10 @@ The data contains:
 - Connect: Number of calls connected
 - Pitch: Number of pitches given
 - Conversation: Number of conversations held
-- Meeting: Number of meetings scheduled (includes both Trellus meetings and additional meetings from external sources)
+- Meeting: Number of meetings scheduled (includes both Trellus meetings and additional meetings from external sources, excluding "Cold Calls (Clay + Trellus)" sources)
+- meetingTimestamps: Array of detailed meeting information with timestamps, lead names, companies, current stages, and sources (only for meetings from valid sources)
+
+Note: The meeting data excludes meetings from "Cold Calls (Clay + Trellus)" source as per filtering rules.
 
 Please analyze this data and provide a clear, conversational answer to the user's query. 
 
@@ -299,6 +302,8 @@ Guidelines:
 - Keep it conversational and easy to understand
 - If asked for rankings, mention the top 3-5 performers
 - Include relevant comparisons or insights
+- When discussing meetings, you can reference the detailed meeting information including lead names, companies, and current stages
+- Be aware that meeting data comes from multiple sources and excludes "Cold Calls (Clay + Trellus)" entries
 
 Example response format:
 "Based on the data for [date range], **[Name]** has the highest number of dials with **[number] dials**. This is significantly higher than the next performer, showing exceptional activity during this period."
