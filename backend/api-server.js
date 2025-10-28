@@ -1,5 +1,6 @@
 import https from 'https';
 import { processExcelFile, getMeetingCountFromExcel, getMeetingDetailsFromExcel } from './excel-processor.js';
+import { processTeamData, getTeamForUser } from './team-data-processor.js';
 
 const CONFIG = {
   API_KEY: 'b7734dc1c976d0a38a0482a63b2dfa1f29f6e081',
@@ -68,6 +69,10 @@ let excelDataCache = null;
 let excelDataCacheTime = null;
 const EXCEL_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
+// Cache for Team data
+let teamDataCache = null;
+let teamDataCacheTime = null;
+
 // Function to get Excel data with caching
 function getExcelData() {
   const now = Date.now();
@@ -78,6 +83,18 @@ function getExcelData() {
     console.log(`Loaded ${excelDataCache.length} Excel records`);
   }
   return excelDataCache;
+}
+
+// Function to get Team data with caching
+function getTeamData() {
+  const now = Date.now();
+  if (!teamDataCache || !teamDataCacheTime || (now - teamDataCacheTime) > EXCEL_CACHE_TTL) {
+    console.log('Loading Team data...');
+    teamDataCache = processTeamData();
+    teamDataCacheTime = now;
+    console.log(`Loaded team data for ${teamDataCache.size} members`);
+  }
+  return teamDataCache;
 }
 
 function makeRequest(endpoint, params, method = 'GET') {
@@ -242,6 +259,7 @@ function calculateColumnValue(metricResult, userId) {
 function generateFlatRows(users, metricsResults, startDate, endDate) {
   const rows = [];
   const excelData = getExcelData();
+  const teamData = getTeamData();
 
   users.forEach(user => {
     const row = {
@@ -264,7 +282,11 @@ function generateFlatRows(users, metricsResults, startDate, endDate) {
     // Combine both counts
     const totalMeetingCount = trellusMeetingCount + excelMeetingCount;
     
+    // Get team information
+    const teamName = getTeamForUser(teamData, user.user_name);
+    
     row.values['Meet'] = totalMeetingCount;
+    row.values['Team'] = teamName;
     row.trellusCount = trellusMeetingCount;
     row.excelCount = excelMeetingCount;
 
