@@ -5,12 +5,17 @@ interface MetricRow {
   userId: string;
   userName: string;
   values: {
-    Dial: number;
-    Connect: number;
-    Pitch: number;
-    Conversation: number;
     Meeting: number;
   };
+  details?: MeetingDetail[];
+}
+
+interface MeetingDetail {
+  source: string;
+  date: string;
+  leadName?: string;
+  company?: string;
+  stage?: string;
 }
 
 interface MetricsData {
@@ -21,7 +26,7 @@ interface MetricsData {
   };
 }
 
-type SortColumn = 'name' | 'dial' | 'connect' | 'pitch' | 'conversation' | 'meeting';
+type SortColumn = 'name' | 'meeting';
 type SortDirection = 'asc' | 'desc';
 
 interface AIQueryResponse {
@@ -50,6 +55,10 @@ function App() {
   const [aiResponse, setAiResponse] = useState<AIQueryResponse | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
+  
+  // Meeting details modal states
+  const [selectedUser, setSelectedUser] = useState<MetricRow | null>(null);
+  const [showDetailsModal, setShowDetailsModal] = useState(false);
 
   const fetchMetrics = async (customStart?: string, customEnd?: string) => {
     setLoading(true);
@@ -124,6 +133,18 @@ function App() {
     }
   };
 
+  const handleMeetingClick = (user: MetricRow) => {
+    if (user.values.Meeting > 0) {
+      setSelectedUser(user);
+      setShowDetailsModal(true);
+    }
+  };
+
+  const closeDetailsModal = () => {
+    setShowDetailsModal(false);
+    setSelectedUser(null);
+  };
+
   const getSortedData = () => {
     if (!data) return [];
     
@@ -135,22 +156,6 @@ function App() {
         case 'name':
           aValue = a.userName.toLowerCase();
           bValue = b.userName.toLowerCase();
-          break;
-        case 'dial':
-          aValue = a.values.Dial;
-          bValue = b.values.Dial;
-          break;
-        case 'connect':
-          aValue = a.values.Connect;
-          bValue = b.values.Connect;
-          break;
-        case 'pitch':
-          aValue = a.values.Pitch;
-          bValue = b.values.Pitch;
-          break;
-        case 'conversation':
-          aValue = a.values.Conversation;
-          bValue = b.values.Conversation;
           break;
         case 'meeting':
           aValue = a.values.Meeting;
@@ -429,66 +434,6 @@ function App() {
                   </th>
                   <th className="text-right px-6 py-4">
                     <button
-                      onClick={() => handleSort('dial')}
-                      className="flex items-center gap-2 ml-auto hover:text-slate-700 transition-colors"
-                    >
-                      <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                        Dial
-                      </span>
-                      {sortColumn === 'dial' && (
-                        sortDirection === 'asc' ? 
-                          <ChevronUp className="w-3 h-3" /> : 
-                          <ChevronDown className="w-3 h-3" />
-                      )}
-                    </button>
-                  </th>
-                  <th className="text-right px-6 py-4">
-                    <button
-                      onClick={() => handleSort('connect')}
-                      className="flex items-center gap-2 ml-auto hover:text-slate-700 transition-colors"
-                    >
-                      <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                        Connect
-                      </span>
-                      {sortColumn === 'connect' && (
-                        sortDirection === 'asc' ? 
-                          <ChevronUp className="w-3 h-3" /> : 
-                          <ChevronDown className="w-3 h-3" />
-                      )}
-                    </button>
-                  </th>
-                  <th className="text-right px-6 py-4">
-                    <button
-                      onClick={() => handleSort('pitch')}
-                      className="flex items-center gap-2 ml-auto hover:text-slate-700 transition-colors"
-                    >
-                      <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                        Pitch
-                      </span>
-                      {sortColumn === 'pitch' && (
-                        sortDirection === 'asc' ? 
-                          <ChevronUp className="w-3 h-3" /> : 
-                          <ChevronDown className="w-3 h-3" />
-                      )}
-                    </button>
-                  </th>
-                  <th className="text-right px-6 py-4">
-                    <button
-                      onClick={() => handleSort('conversation')}
-                      className="flex items-center gap-2 ml-auto hover:text-slate-700 transition-colors"
-                    >
-                      <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                        Conv
-                      </span>
-                      {sortColumn === 'conversation' && (
-                        sortDirection === 'asc' ? 
-                          <ChevronUp className="w-3 h-3" /> : 
-                          <ChevronDown className="w-3 h-3" />
-                      )}
-                    </button>
-                  </th>
-                  <th className="text-right px-6 py-4">
-                    <button
                       onClick={() => handleSort('meeting')}
                       className="flex items-center gap-2 ml-auto hover:text-slate-700 transition-colors"
                     >
@@ -506,7 +451,7 @@ function App() {
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {getSortedData().map((row, index) => {
-                  const hasActivity = row.values.Dial > 0;
+                  const hasActivity = row.values.Meeting > 0;
 
                   return (
                     <tr
@@ -533,38 +478,13 @@ function App() {
                       </td>
                       <td className="px-6 py-4">
                         <div className="text-right">
-                          <span className={`text-sm font-medium ${hasActivity ? 'text-slate-700' : 'text-slate-400'}`}>
-                            {row.values.Dial}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="text-right">
-                          <span className={`text-sm font-medium ${hasActivity ? 'text-slate-700' : 'text-slate-400'}`}>
-                            {row.values.Connect}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="text-right">
-                          <span className={`text-sm font-medium ${hasActivity ? 'text-slate-700' : 'text-slate-400'}`}>
-                            {row.values.Pitch}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="text-right">
-                          <span className={`text-sm font-medium ${hasActivity ? 'text-slate-700' : 'text-slate-400'}`}>
-                            {row.values.Conversation}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="text-right">
                           {row.values.Meeting > 0 ? (
-                            <div className="inline-flex items-center justify-center w-8 h-8 rounded-md bg-slate-900 text-white text-sm font-bold">
+                            <button
+                              onClick={() => handleMeetingClick(row)}
+                              className="inline-flex items-center justify-center w-8 h-8 rounded-md bg-slate-900 text-white text-sm font-bold hover:bg-slate-700 transition-colors cursor-pointer"
+                            >
                               {row.values.Meeting}
-                            </div>
+                            </button>
                           ) : (
                             <span className="text-sm font-medium text-slate-400">
                               {row.values.Meeting}
@@ -584,6 +504,76 @@ function App() {
           Showing {getSortedData().length} users
         </div>
       </div>
+
+      {/* Meeting Details Modal */}
+      {showDetailsModal && selectedUser && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[80vh] overflow-hidden">
+            <div className="flex items-center justify-between p-6 border-b border-slate-200">
+              <h2 className="text-xl font-semibold text-slate-900">
+                Meeting Details - {selectedUser.userName}
+              </h2>
+              <button
+                onClick={closeDetailsModal}
+                className="text-slate-400 hover:text-slate-600 transition-colors"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div className="p-6 overflow-y-auto max-h-[60vh]">
+              <div className="mb-4">
+                <div className="text-sm text-slate-600 mb-2">
+                  Total Meetings: <span className="font-semibold text-slate-900">{selectedUser.values.Meeting}</span>
+                </div>
+              </div>
+              
+              {selectedUser.details && selectedUser.details.length > 0 ? (
+                <div className="space-y-4">
+                  <h3 className="text-lg font-medium text-slate-900 mb-3">Meeting History</h3>
+                  {selectedUser.details.map((detail, index) => (
+                    <div key={index} className="bg-slate-50 rounded-lg p-4 border border-slate-200">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <div className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">Source</div>
+                          <div className="text-sm text-slate-900">{detail.source}</div>
+                        </div>
+                        <div>
+                          <div className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">Date</div>
+                          <div className="text-sm text-slate-900">{detail.date}</div>
+                        </div>
+                        {detail.leadName && (
+                          <div>
+                            <div className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">Lead Name</div>
+                            <div className="text-sm text-slate-900">{detail.leadName}</div>
+                          </div>
+                        )}
+                        {detail.company && (
+                          <div>
+                            <div className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">Company</div>
+                            <div className="text-sm text-slate-900">{detail.company}</div>
+                          </div>
+                        )}
+                        {detail.stage && (
+                          <div className="col-span-2">
+                            <div className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">Stage</div>
+                            <div className="text-sm text-slate-900">{detail.stage}</div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <div className="text-slate-400 text-sm">No detailed meeting information available</div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

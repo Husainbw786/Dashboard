@@ -1,4 +1,5 @@
 import https from 'https';
+import { processExcelData, matchUsersWithExcelData, getExcelDataSummary } from './excel-processor.js';
 
 const CONFIG = {
   API_KEY: 'b7734dc1c976d0a38a0482a63b2dfa1f29f6e081',
@@ -46,50 +47,9 @@ const LIVE_DURATION_GT_ZERO = {
   value_safe: 0
 };
 
-const DEFAULT_STAGE_CONFIG = {
+// Updated config to only fetch Meeting data
+const MEETING_ONLY_CONFIG = {
   options: [
-    {
-      label: 'Dial',
-      filter: []
-    },
-    {
-      label: 'Connect',
-      filter: [[LIVE_DURATION_GT_ZERO]]
-    },
-    {
-      label: 'Pitch',
-      filter: [[
-        {
-          column_name: SessionMetricsColumns.STAGE,
-          table: BackendTables.SESSION_METRICS,
-          operator: FilterOperator.IN,
-          value_safe: [STAGE.PITCHED, STAGE.CONVERSATION, STAGE.BOOKED]
-        },
-        {
-          column_name: SessionMetricsColumns.LIVE_DURATION,
-          table: BackendTables.SESSION_METRICS,
-          operator: FilterOperator.GT,
-          value_safe: 60
-        }
-      ]]
-    },
-    {
-      label: 'Conversation',
-      filter: [[
-        {
-          column_name: SessionMetricsColumns.STAGE,
-          table: BackendTables.SESSION_METRICS,
-          operator: FilterOperator.IN,
-          value_safe: [STAGE.CONVERSATION, STAGE.BOOKED]
-        },
-        {
-          column_name: SessionMetricsColumns.LIVE_DURATION,
-          table: BackendTables.SESSION_METRICS,
-          operator: FilterOperator.GT,
-          value_safe: 90
-        }
-      ]]
-    },
     {
       label: 'Meeting',
       filter: [[{
@@ -262,28 +222,45 @@ function calculateColumnValue(metricResult, userId) {
   return numeratorMap.get(userId) ?? 0;
 }
 
-function generateFlatRows(users, metricsResults) {
+function generateFlatRows(users, metricsResults, excelMeetings = {}) {
   const rows = [];
 
   users.forEach(user => {
     const row = {
       userId: user.user_id,
       userName: user.user_name,
-      values: {}
+      values: {},
+      details: []
     };
 
+    // Get Trellus meeting count
+    let trellusMeetings = 0;
     metricsResults.forEach(metricResult => {
       const rawValue = calculateColumnValue(metricResult, user.user_id);
-      row.values[metricResult.metric.label] = rawValue;
+      if (metricResult.metric.label === 'Meeting') {
+        trellusMeetings = rawValue;
+      }
     });
+
+    // Get Excel meeting data for this user
+    const excelUserData = excelMeetings[user.user_id] || { meetings: [], totalCount: 0 };
+    
+    // Only add Excel meetings to details (not Trellus meetings)
+    if (excelUserData.meetings && excelUserData.meetings.length > 0) {
+      row.details.push(...excelUserData.meetings);
+    }
+
+    // Combine meeting counts: Trellus + Excel
+    const totalMeetings = trellusMeetings + excelUserData.totalCount;
+    row.values.Meeting = totalMeetings;
 
     rows.push(row);
   });
 
-  const firstMetricLabel = metricsResults[0].metric.label;
+  // Sort by total meeting count
   rows.sort((a, b) => {
-    const aValue = a.values[firstMetricLabel] ?? 0;
-    const bValue = b.values[firstMetricLabel] ?? 0;
+    const aValue = a.values.Meeting ?? 0;
+    const bValue = b.values.Meeting ?? 0;
     return bValue - aValue;
   });
 
@@ -309,17 +286,30 @@ async function getMetricsDataWithDates(startDate, endDate) {
     };
   }
 
-  const stageConfig = DEFAULT_STAGE_CONFIG;
+  // Process Excel data for the same date range
+  console.log('Processing Excel data for date range:', startDate.toISOString().split('T')[0], 'to', endDate.toISOString().split('T')[0]);
+  const excelMeetings = processExcelData(startDate, endDate);
+  const excelSummary = getExcelDataSummary(excelMeetings);
+  console.log('Excel data summary:', excelSummary);
+  
+  // Match Excel users with Trellus users
+  const userMapping = matchUsersWithExcelData(users, excelMeetings);
+  
+  // Only fetch Meeting metrics from Trellus
+  const stageConfig = MEETING_ONLY_CONFIG;
   const metrics = buildMetrics(stageConfig);
   const metricsResults = await fetchAllMetricsData(metrics, startDate, endDate);
-  const rows = generateFlatRows(users, metricsResults);
+  
+  // Generate combined rows
+  const rows = generateFlatRows(users, metricsResults, userMapping);
 
   return {
     rows,
     dateRange: {
       start: startDate.toISOString().split('T')[0],
       end: endDate.toISOString().split('T')[0]
-    }
+    },
+    excelSummary
   };
 }
 
