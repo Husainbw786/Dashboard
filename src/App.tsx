@@ -1,6 +1,15 @@
 import { useEffect, useState } from 'react';
 import { ChevronUp, ChevronDown, RefreshCw, Calendar, MessageSquare, Send, Loader2 } from 'lucide-react';
 
+interface MeetingTimestamp {
+  timestamp: string;
+  leadName: string;
+  companyName: string;
+  currentStage: string;
+  meetingBookedDate: string;
+  sourceOfLead: string;
+}
+
 interface MetricRow {
   userId: string;
   userName: string;
@@ -11,6 +20,7 @@ interface MetricRow {
     Conversation: number;
     Meeting: number;
   };
+  meetingTimestamps?: MeetingTimestamp[];
 }
 
 interface MetricsData {
@@ -50,6 +60,10 @@ function App() {
   const [aiResponse, setAiResponse] = useState<AIQueryResponse | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
+  
+  // Meeting details modal states
+  const [selectedUser, setSelectedUser] = useState<MetricRow | null>(null);
+  const [showMeetingModal, setShowMeetingModal] = useState(false);
 
   const fetchMetrics = async (customStart?: string, customEnd?: string) => {
     setLoading(true);
@@ -166,6 +180,28 @@ function App() {
     });
     
     return sortedRows;
+  };
+
+  const handleMeetingClick = (row: MetricRow) => {
+    if (row.values.Meeting > 0) {
+      setSelectedUser(row);
+      setShowMeetingModal(true);
+    }
+  };
+
+  const formatTimestamp = (timestamp: string) => {
+    try {
+      const [datePart, timePart] = timestamp.split(' ');
+      const [month, day, year] = datePart.split('/');
+      const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+      return date.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+      });
+    } catch {
+      return timestamp;
+    }
   };
 
   useEffect(() => {
@@ -562,9 +598,13 @@ function App() {
                       <td className="px-6 py-4">
                         <div className="text-right">
                           {row.values.Meeting > 0 ? (
-                            <div className="inline-flex items-center justify-center w-8 h-8 rounded-md bg-slate-900 text-white text-sm font-bold">
+                            <button
+                              onClick={() => handleMeetingClick(row)}
+                              className="inline-flex items-center justify-center w-8 h-8 rounded-md bg-slate-900 text-white text-sm font-bold hover:bg-slate-700 transition-colors cursor-pointer"
+                              title={`Click to view ${row.values.Meeting} meeting details`}
+                            >
                               {row.values.Meeting}
-                            </div>
+                            </button>
                           ) : (
                             <span className="text-sm font-medium text-slate-400">
                               {row.values.Meeting}
@@ -584,6 +624,105 @@ function App() {
           Showing {getSortedData().length} users
         </div>
       </div>
+
+      {/* Meeting Details Modal */}
+      {showMeetingModal && selectedUser && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[80vh] overflow-hidden">
+            <div className="bg-slate-50 px-6 py-4 border-b border-slate-200">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-lg font-semibold text-slate-900">
+                    Meeting Details - {selectedUser.userName}
+                  </h3>
+                  <p className="text-sm text-slate-600 mt-1">
+                    {selectedUser.values.Meeting} meeting{selectedUser.values.Meeting !== 1 ? 's' : ''} found
+                  </p>
+                </div>
+                <button
+                  onClick={() => setShowMeetingModal(false)}
+                  className="text-slate-400 hover:text-slate-600 transition-colors"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+            
+            <div className="p-6 overflow-y-auto max-h-[60vh]">
+              {selectedUser.meetingTimestamps && selectedUser.meetingTimestamps.length > 0 ? (
+                <div className="space-y-4">
+                  {selectedUser.meetingTimestamps.map((meeting, index) => (
+                    <div key={index} className="bg-slate-50 rounded-lg p-4 border border-slate-200">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <div className="text-sm font-medium text-slate-700 mb-1">Meeting Date</div>
+                          <div className="text-sm text-slate-900 font-semibold">
+                            {formatTimestamp(meeting.timestamp)}
+                          </div>
+                        </div>
+                        
+                        <div>
+                          <div className="text-sm font-medium text-slate-700 mb-1">Current Stage</div>
+                          <div className="text-sm text-slate-900">
+                            {meeting.currentStage || 'N/A'}
+                          </div>
+                        </div>
+                        
+                        <div>
+                          <div className="text-sm font-medium text-slate-700 mb-1">Lead Contact</div>
+                          <div className="text-sm text-slate-900">
+                            {meeting.leadName || 'N/A'}
+                          </div>
+                        </div>
+                        
+                        <div>
+                          <div className="text-sm font-medium text-slate-700 mb-1">Company</div>
+                          <div className="text-sm text-slate-900">
+                            {meeting.companyName || 'N/A'}
+                          </div>
+                        </div>
+                        
+                        <div>
+                          <div className="text-sm font-medium text-slate-700 mb-1">Source of Lead</div>
+                          <div className="text-sm text-slate-900">
+                            {meeting.sourceOfLead || 'N/A'}
+                          </div>
+                        </div>
+                        
+                        {meeting.meetingBookedDate && (
+                          <div>
+                            <div className="text-sm font-medium text-slate-700 mb-1">Meeting Booked Date</div>
+                            <div className="text-sm text-slate-900">
+                              {meeting.meetingBookedDate}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <div className="text-slate-500 text-sm">
+                    No meeting details available for this user.
+                  </div>
+                </div>
+              )}
+            </div>
+            
+            <div className="bg-slate-50 px-6 py-4 border-t border-slate-200">
+              <button
+                onClick={() => setShowMeetingModal(false)}
+                className="w-full px-4 py-2 bg-slate-800 text-white text-sm font-medium rounded-md hover:bg-slate-700 transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

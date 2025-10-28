@@ -3,7 +3,7 @@ import cors from 'cors';
 import https from 'https';
 import OpenAI from 'openai';
 import dotenv from 'dotenv';
-import { getMetricsData, getMetricsDataWithDates } from './api-server.js';
+import { getMetricsData, getMetricsDataWithDates, getMetricsDataWithMeetings } from './api-server.js';
 
 // Load environment variables
 dotenv.config();
@@ -142,21 +142,60 @@ app.post('/api/metrics', async (req, res) => {
 
 app.get('/api/metrics-data', async (req, res) => {
   try {
-    const { startDate, endDate, days } = req.query;
+    const { startDate, endDate, days, debug } = req.query;
+    const debugMode = debug === 'true';
     
     let data;
     if (startDate && endDate) {
-      // Use custom date range
-      data = await getMetricsDataWithDates(new Date(startDate), new Date(endDate));
+      // Use custom date range with meeting integration
+      data = await getMetricsDataWithMeetings(new Date(startDate), new Date(endDate), debugMode);
     } else {
-      // Use days parameter (backward compatibility)
+      // Use days parameter (backward compatibility) with meeting integration
       const daysNum = parseInt(days) || 1;
-      data = await getMetricsData(daysNum);
+      const endDateObj = new Date();
+      const startDateObj = new Date(Date.now() - daysNum * 24 * 60 * 60 * 1000);
+      data = await getMetricsDataWithMeetings(startDateObj, endDateObj, debugMode);
     }
     
     res.json(data);
   } catch (error) {
     console.error('Error getting metrics data:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// New endpoint to get meeting details for a specific user
+app.get('/api/user-meetings/:userId', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { startDate, endDate, days } = req.query;
+    
+    let data;
+    if (startDate && endDate) {
+      data = await getMetricsDataWithMeetings(new Date(startDate), new Date(endDate));
+    } else {
+      const daysNum = parseInt(days) || 30; // Default to 30 days for meeting details
+      const endDateObj = new Date();
+      const startDateObj = new Date(Date.now() - daysNum * 24 * 60 * 60 * 1000);
+      data = await getMetricsDataWithMeetings(startDateObj, endDateObj);
+    }
+    
+    // Find the user's data
+    const userRow = data.rows.find(row => row.userId === userId);
+    
+    if (!userRow) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    res.json({
+      userId: userRow.userId,
+      userName: userRow.userName,
+      totalMeetings: userRow.values.Meeting,
+      meetingDetails: userRow.meetingTimestamps || [],
+      dateRange: data.dateRange
+    });
+  } catch (error) {
+    console.error('Error getting user meeting details:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -247,7 +286,7 @@ The data contains:
 - Connect: Number of calls connected
 - Pitch: Number of pitches given
 - Conversation: Number of conversations held
-- Meeting: Number of meetings scheduled
+- Meeting: Number of meetings scheduled (includes both Trellus meetings and additional meetings from external sources)
 
 Please analyze this data and provide a clear, conversational answer to the user's query. 
 

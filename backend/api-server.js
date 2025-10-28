@@ -1,4 +1,5 @@
 import https from 'https';
+import fetch from 'node-fetch';
 
 const CONFIG = {
   API_KEY: 'b7734dc1c976d0a38a0482a63b2dfa1f29f6e081',
@@ -323,4 +324,191 @@ async function getMetricsDataWithDates(startDate, endDate) {
   };
 }
 
-export { getMetricsData, getMetricsDataWithDates };
+// Function to fetch meeting data from flow.sokt.io API
+async function fetchMeetingData() {
+  try {
+    const response = await fetch('https://flow.sokt.io/func/scritKOiRBu9');
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error('Error fetching meeting data:', error);
+    throw error;
+  }
+}
+
+// Function to parse date from timestamp string
+function parseTimestamp(timestamp) {
+  // Handle format like "10/14/2025 14:22:23"
+  const [datePart, timePart] = timestamp.split(' ');
+  const [month, day, year] = datePart.split('/');
+  return new Date(year, month - 1, day);
+}
+
+// Function to normalize names for matching
+function normalizeName(name) {
+  if (!name) return '';
+  return name.toLowerCase()
+    .replace(/[^a-z\s]/g, '') // Remove special characters
+    .replace(/\s+/g, ' ') // Replace multiple spaces with single space
+    .trim();
+}
+
+// Function to check if names match (fuzzy matching)
+function namesMatch(name1, name2) {
+  const normalized1 = normalizeName(name1);
+  const normalized2 = normalizeName(name2);
+  
+  if (normalized1 === normalized2) return true;
+  
+  // Check if one name contains the other (for cases like "Aashima Soni" vs "Aashima soni")
+  const words1 = normalized1.split(' ');
+  const words2 = normalized2.split(' ');
+  
+  // Check if at least 2 words match or if it's a single name match
+  let matchCount = 0;
+  for (const word1 of words1) {
+    for (const word2 of words2) {
+      if (word1 === word2 && word1.length > 2) { // Ignore very short words
+        matchCount++;
+      }
+    }
+  }
+  
+  return matchCount >= Math.min(words1.length, words2.length, 2);
+}
+
+// Function to filter meeting data by date range
+function filterMeetingDataByDate(meetingData, startDate, endDate) {
+  if (!meetingData || !meetingData.data) return [];
+  
+  return meetingData.data.filter(meeting => {
+    if (!meeting.Timestamp) return false;
+    
+    try {
+      const meetingDate = parseTimestamp(meeting.Timestamp);
+      return meetingDate >= startDate && meetingDate <= endDate;
+    } catch (error) {
+      console.error('Error parsing timestamp:', meeting.Timestamp, error);
+      return false;
+    }
+  });
+}
+
+// Function to merge meeting data with Trellus data
+function mergeMeetingData(trellusRows, meetingData, startDate, endDate, debug = false) {
+  const filteredMeetings = filterMeetingDataByDate(meetingData, startDate, endDate);
+  
+  if (debug) {
+    console.log(`Filtered meetings for date range: ${filteredMeetings.length} meetings`);
+  }
+  
+  // Create a map of meeting counts and timestamps by normalized name
+  const meetingMap = new Map();
+  
+  filteredMeetings.forEach(meeting => {
+    const name = meeting.Name;
+    if (!name) return;
+    
+    // Skip meetings with "Cold Calls (Clay + Trellus)" as source
+    const sourceOfLead = meeting['Source of Lead'];
+    if (sourceOfLead === 'Cold Calls (Clay + Trellus)') {
+      return; // Skip this meeting
+    }
+    
+    const normalizedName = normalizeName(name);
+    if (!meetingMap.has(normalizedName)) {
+      meetingMap.set(normalizedName, {
+        count: 0,
+        timestamps: []
+      });
+    }
+    
+    const meetingInfo = meetingMap.get(normalizedName);
+    meetingInfo.count++;
+    meetingInfo.timestamps.push({
+      timestamp: meeting.Timestamp,
+      leadName: meeting['Lead Name (individual you were speaking to)'] || '',
+      companyName: meeting['Company Name'] || '',
+      currentStage: meeting['Current Stage'] || '',
+      meetingBookedDate: meeting['Meeting Booked (date of the cold call conversion)'] || '',
+      sourceOfLead: sourceOfLead || ''
+    });
+  });
+  
+  if (debug) {
+    console.log(`Meeting map created with ${meetingMap.size} unique names`);
+    if (meetingMap.size > 0) {
+      console.log('Sample meeting names:', Array.from(meetingMap.keys()).slice(0, 5));
+    }
+  }
+  
+  // Merge the data
+  return trellusRows.map(row => {
+    let additionalMeetings = 0;
+    let meetingTimestamps = [];
+    
+    // Try to find matching meeting data
+    for (const [normalizedMeetingName, meetingInfo] of meetingMap.entries()) {
+      if (namesMatch(row.userName, normalizedMeetingName)) {
+        if (debug) {
+          console.log(`Match found: ${row.userName} -> ${normalizedMeetingName} (${meetingInfo.count} meetings)`);
+        }
+        additionalMeetings += meetingInfo.count;
+        meetingTimestamps = meetingTimestamps.concat(meetingInfo.timestamps);
+      }
+    }
+    
+    // Update the Meeting count
+    const originalMeetingCount = row.values.Meeting || 0;
+    const totalMeetingCount = originalMeetingCount + additionalMeetings;
+    
+    return {
+      ...row,
+      values: {
+        ...row.values,
+        Meeting: totalMeetingCount
+      },
+      meetingTimestamps: meetingTimestamps.sort((a, b) => {
+        const dateA = parseTimestamp(a.timestamp);
+        const dateB = parseTimestamp(b.timestamp);
+        return dateB - dateA; // Sort by newest first
+      })
+    };
+  });
+}
+
+// Enhanced function to get metrics data with meeting integration
+async function getMetricsDataWithMeetings(startDate, endDate, debug = false) {
+  try {
+    if (debug) {
+      console.log(`Fetching metrics data for date range: ${startDate.toISOString()} to ${endDate.toISOString()}`);
+    }
+    
+    // Fetch both Trellus and meeting data in parallel
+    const [trellusData, meetingData] = await Promise.all([
+      getMetricsDataWithDates(startDate, endDate),
+      fetchMeetingData()
+    ]);
+    
+    if (debug) {
+      console.log(`Fetched ${trellusData.rows.length} Trellus rows and ${meetingData.data ? meetingData.data.length : 0} meeting records`);
+    }
+    
+    // Merge the meeting data with Trellus data
+    const mergedRows = mergeMeetingData(trellusData.rows, meetingData, startDate, endDate, debug);
+    
+    return {
+      ...trellusData,
+      rows: mergedRows
+    };
+  } catch (error) {
+    console.error('Error getting metrics data with meetings:', error);
+    // Fallback to original data if meeting API fails
+    return getMetricsDataWithDates(startDate, endDate);
+  }
+}
+
+export { getMetricsData, getMetricsDataWithDates, getMetricsDataWithMeetings };
