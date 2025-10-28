@@ -3,7 +3,7 @@ import cors from 'cors';
 import https from 'https';
 import OpenAI from 'openai';
 import dotenv from 'dotenv';
-import { getMetricsData, getMetricsDataWithDates } from './api-server.js';
+import { getMetricsData, getMetricsDataWithDates, getMeetingDetails } from './api-server.js';
 
 // Load environment variables
 dotenv.config();
@@ -286,6 +286,35 @@ Example response format:
 
   } catch (error) {
     console.error('Error processing AI query:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Meeting details endpoint
+app.get('/api/meeting-details', async (req, res) => {
+  try {
+    const { userName, startDate, endDate } = req.query;
+    
+    if (!userName) {
+      return res.status(400).json({ error: 'userName is required' });
+    }
+    
+    // Use provided dates or default to last 30 days
+    const start = startDate ? new Date(startDate) : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const end = endDate ? new Date(endDate) : new Date();
+    
+    const details = await getMeetingDetails(userName, start, end);
+    
+    res.json({
+      userName,
+      dateRange: {
+        start: start.toISOString().split('T')[0],
+        end: end.toISOString().split('T')[0]
+      },
+      meetings: details
+    });
+  } catch (error) {
+    console.error('Error getting meeting details:', error);
     res.status(500).json({ error: error.message });
   }
 });

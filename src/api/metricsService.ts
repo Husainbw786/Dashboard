@@ -284,3 +284,8 @@ export async function getMetricsDataWithDateRange(startDate: string, endDate: st
 export async function queryAI(query: string) {
   return makeRequest('/api/ai-query', { query }, 'POST');
 }
+
+// Meeting details function
+export async function getMeetingDetails(userName: string, startDate: string, endDate: string) {
+  return makeRequest('/api/meeting-details', { userName, startDate, endDate });
+}

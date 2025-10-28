@@ -1,4 +1,5 @@
 import https from 'https';
+import { processExcelFile, getMeetingCountFromExcel, getMeetingDetailsFromExcel } from './excel-processor.js';
 
 const CONFIG = {
   API_KEY: 'b7734dc1c976d0a38a0482a63b2dfa1f29f6e081',
@@ -46,50 +47,9 @@ const LIVE_DURATION_GT_ZERO = {
   value_safe: 0
 };
 
+// Updated config to only include Meeting stage
 const DEFAULT_STAGE_CONFIG = {
   options: [
-    {
-      label: 'Dial',
-      filter: []
-    },
-    {
-      label: 'Connect',
-      filter: [[LIVE_DURATION_GT_ZERO]]
-    },
-    {
-      label: 'Pitch',
-      filter: [[
-        {
-          column_name: SessionMetricsColumns.STAGE,
-          table: BackendTables.SESSION_METRICS,
-          operator: FilterOperator.IN,
-          value_safe: [STAGE.PITCHED, STAGE.CONVERSATION, STAGE.BOOKED]
-        },
-        {
-          column_name: SessionMetricsColumns.LIVE_DURATION,
-          table: BackendTables.SESSION_METRICS,
-          operator: FilterOperator.GT,
-          value_safe: 60
-        }
-      ]]
-    },
-    {
-      label: 'Conversation',
-      filter: [[
-        {
-          column_name: SessionMetricsColumns.STAGE,
-          table: BackendTables.SESSION_METRICS,
-          operator: FilterOperator.IN,
-          value_safe: [STAGE.CONVERSATION, STAGE.BOOKED]
-        },
-        {
-          column_name: SessionMetricsColumns.LIVE_DURATION,
-          table: BackendTables.SESSION_METRICS,
-          operator: FilterOperator.GT,
-          value_safe: 90
-        }
-      ]]
-    },
     {
       label: 'Meeting',
       filter: [[{
@@ -100,8 +60,25 @@ const DEFAULT_STAGE_CONFIG = {
       }]]
     }
   ],
-  cumulative: true
+  cumulative: false
 };
+
+// Cache for Excel data to avoid re-reading file on every request
+let excelDataCache = null;
+let excelDataCacheTime = null;
+const EXCEL_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+// Function to get Excel data with caching
+function getExcelData() {
+  const now = Date.now();
+  if (!excelDataCache || !excelDataCacheTime || (now - excelDataCacheTime) > EXCEL_CACHE_TTL) {
+    console.log('Loading Excel data...');
+    excelDataCache = processExcelFile();
+    excelDataCacheTime = now;
+    console.log(`Loaded ${excelDataCache.length} Excel records`);
+  }
+  return excelDataCache;
+}
 
 function makeRequest(endpoint, params, method = 'GET') {
   return new Promise((resolve, reject) => {
@@ -262,8 +239,9 @@ function calculateColumnValue(metricResult, userId) {
   return numeratorMap.get(userId) ?? 0;
 }
 
-function generateFlatRows(users, metricsResults) {
+function generateFlatRows(users, metricsResults, startDate, endDate) {
   const rows = [];
+  const excelData = getExcelData();
 
   users.forEach(user => {
     const row = {
@@ -272,18 +250,31 @@ function generateFlatRows(users, metricsResults) {
       values: {}
     };
 
+    // Get Trellus Meeting count
+    let trellusMeetingCount = 0;
     metricsResults.forEach(metricResult => {
-      const rawValue = calculateColumnValue(metricResult, user.user_id);
-      row.values[metricResult.metric.label] = rawValue;
+      if (metricResult.metric.label === 'Meeting') {
+        trellusMeetingCount = calculateColumnValue(metricResult, user.user_id);
+      }
     });
+
+    // Get Excel Meeting count for the same user and date range
+    const excelMeetingCount = getMeetingCountFromExcel(excelData, user.user_name, startDate, endDate);
+    
+    // Combine both counts
+    const totalMeetingCount = trellusMeetingCount + excelMeetingCount;
+    
+    row.values['Meet'] = totalMeetingCount;
+    row.trellusCount = trellusMeetingCount;
+    row.excelCount = excelMeetingCount;
 
     rows.push(row);
   });
 
-  const firstMetricLabel = metricsResults[0].metric.label;
+  // Sort by total meeting count descending
   rows.sort((a, b) => {
-    const aValue = a.values[firstMetricLabel] ?? 0;
-    const bValue = b.values[firstMetricLabel] ?? 0;
+    const aValue = a.values['Meet'] ?? 0;
+    const bValue = b.values['Meet'] ?? 0;
     return bValue - aValue;
   });
 
@@ -312,7 +303,7 @@ async function getMetricsDataWithDates(startDate, endDate) {
   const stageConfig = DEFAULT_STAGE_CONFIG;
   const metrics = buildMetrics(stageConfig);
   const metricsResults = await fetchAllMetricsData(metrics, startDate, endDate);
-  const rows = generateFlatRows(users, metricsResults);
+  const rows = generateFlatRows(users, metricsResults, startDate, endDate);
 
   return {
     rows,
@@ -323,4 +314,10 @@ async function getMetricsDataWithDates(startDate, endDate) {
   };
 }
 
-export { getMetricsData, getMetricsDataWithDates };
+// Function to get meeting details for a specific user
+async function getMeetingDetails(userName, startDate, endDate) {
+  const excelData = getExcelData();
+  return getMeetingDetailsFromExcel(excelData, userName, startDate, endDate);
+}
+
+export { getMetricsData, getMetricsDataWithDates, getMeetingDetails };
