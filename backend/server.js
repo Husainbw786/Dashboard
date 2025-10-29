@@ -113,31 +113,6 @@ app.get('/api/users', async (req, res) => {
   }
 });
 
-app.post('/api/metrics', async (req, res) => {
-  try {
-    const { selects, cnf, group_by, start, end } = req.body;
-
-    const params = {
-      api_key: CONFIG.API_KEY,
-      selects,
-      cnf,
-      group_by,
-      start,
-      end,
-    };
-
-    if (CONFIG.TEAM_ID) {
-      params.team_id = CONFIG.TEAM_ID;
-    }
-
-    const response = await makeRequest(ENDPOINTS.METRIC_DETAILS_V6, params, 'GET');
-    res.json(response);
-  } catch (error) {
-    console.error('Error fetching metrics:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
 // Metrics data function imported at top
 
 app.get('/api/metrics-data', async (req, res) => {
@@ -160,42 +135,6 @@ app.get('/api/metrics-data', async (req, res) => {
     res.json(data);
   } catch (error) {
     console.error('Error getting metrics data:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// New endpoint to get meeting details for a specific user
-app.get('/api/user-meetings/:userId', async (req, res) => {
-  try {
-    const { userId } = req.params;
-    const { startDate, endDate, days } = req.query;
-    
-    let data;
-    if (startDate && endDate) {
-      data = await getMetricsDataWithMeetings(new Date(startDate), new Date(endDate));
-    } else {
-      const daysNum = parseInt(days) || 30; // Default to 30 days for meeting details
-      const endDateObj = new Date();
-      const startDateObj = new Date(Date.now() - daysNum * 24 * 60 * 60 * 1000);
-      data = await getMetricsDataWithMeetings(startDateObj, endDateObj);
-    }
-    
-    // Find the user's data
-    const userRow = data.rows.find(row => row.userId === userId);
-    
-    if (!userRow) {
-      return res.status(404).json({ error: 'User not found' });
-    }
-    
-    res.json({
-      userId: userRow.userId,
-      userName: userRow.userName,
-      totalMeetings: userRow.values.Meeting,
-      meetingDetails: userRow.meetingTimestamps || [],
-      dateRange: data.dateRange
-    });
-  } catch (error) {
-    console.error('Error getting user meeting details:', error);
     res.status(500).json({ error: error.message });
   }
 });
