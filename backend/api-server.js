@@ -347,6 +347,107 @@ function parseTimestamp(timestamp) {
   return new Date(year, month - 1, day);
 }
 
+// Team mapping data
+const TEAM_MAPPING = {
+  "Aashima Soni": "Botzilla",
+  "Aastha Jain": "Botzilla",
+  "Abhishek Joshi": "Botzilla",
+  "Adarsh Kaushal": "Botzilla",
+  "Aditi Soni": "Alphabots",
+  "Ananya Chauhan": "Cloudtech",
+  "Anika Garg": "Botzilla",
+  "Anish Alam": "Alphabots",
+  "Anjali Meena": "Cloudtech",
+  "Anjali Pandey": "Botzilla",
+  "Ankit Kumar Patel": "Botzilla",
+  "Anurag Sontale": "Cloudtech",
+  "Anusha Khare": "Botzilla",
+  "Anushka Pawar": "Cloudtech",
+  "Apurva Dubey": "KnowcloudAI",
+  "Arpit Gupta": "Cloudtech",
+  "Atharv Bhoot": "Alphabots",
+  "Atharv Tiwari": "KnowcloudAI",
+  "Avani Lakhotia": "Alphabots",
+  "Ayush Verma": "Cloudtech",
+  "Bhakti Atul Landge": "Botzilla",
+  "Deepika Saxena": "Botzilla",
+  "Digvijay Suryawanshi": "Alphabots",
+  "Divyansh Bansal": "Cloudtech",
+  "Drishti Gupta": "Cloudtech",
+  "Eureka Baranwal": "Alphabots",
+  "HARSH RAJ": "Botzilla",
+  "Harsh Srivastava": "Botzilla",
+  "Harshit Parwani": "Botzilla",
+  "Himanshu Malviya": "Botzilla",
+  "Jasleen Kaur": "Alphabots",
+  "Jessica Aaron": "Hyperflex",
+  "Jison Nongmeikapam": "Botzilla",
+  "Karishma Sankhala": "Alphabots",
+  "Khushi Malviya": "Botzilla",
+  "krishnraj singh rathod": "Botzilla",
+  "Lovish Sahota": "Alphabots",
+  "Matthew Clay": "KnowcloudAI",
+  "Mohmmad Junaid": "Alphabots",
+  "Nihal Rathod": "Alphabots",
+  "Nilesh Rathore": "Alphabots",
+  "Nisha Singh": "Alphabots",
+  "Ojasvee Sharma": "KnowcloudAI",
+  "Pallavi Bharti": "Alphabots",
+  "Pavitra Rai": "Botzilla",
+  "Pranali Chaudhari": "Botzilla",
+  "Rahul Mathur": "Alphabots",
+  "Raj Thakur": "KnowcloudAI",
+  "Rohan Dsouza": "Cloudtech",
+  "Rohan Gothwal": "Cloudtech",
+  "Rohit Pagare": "Alphabots",
+  "Rohit Tanwar": "Alphabots",
+  "Sakshi Choudhary": "Alphabots",
+  "Sakshi Jaiswal": "Alphabots",
+  "Sakshi Patidar": "Botzilla",
+  "Saloni K": "Alphabots",
+  "Sanket Nathani": "KnowcloudAI",
+  "Sanskriti Rathore": "KnowcloudAI",
+  "Shailendra Singh Ranawat": "KnowcloudAI",
+  "Shashank Giri": "Alphabots",
+  "Shantanu Rajgire": "Alphabots",
+  "Shivam Bhatnagar": "Botzilla",
+  "Shivam Kapil": "Alphabots",
+  "Shivani V S": "Alphabots",
+  "Shravani Neelam": "Botzilla",
+  "Siddhant Singh": "Botzilla",
+  "Simran Subba Nembang": "Botzilla",
+  "Soumya Sharma": "KnowcloudAI",
+  "Suyog Shewale": "Botzilla",
+  "Tanay Patekar": "Alphabots",
+  "Tina Bidikikar": "Alphabots",
+  "Tushar Sandhu": "Alphabots",
+  "Uday Yada": "KnowcloudAI",
+  "uddeshya Saxena": "Alphabots",
+  "Vaibhav Shresth": "Alphabots",
+  "Vaidehi Khande": "KnowcloudAI",
+  "Vishvajit Jadha": "Botzilla",
+  "zahid hasan": "Alphabots"
+};
+
+// Function to get team for a user
+function getTeamForUser(userName) {
+  if (!userName) return 'NA';
+  
+  // First try exact match
+  if (TEAM_MAPPING[userName]) {
+    return TEAM_MAPPING[userName];
+  }
+  
+  // Then try fuzzy matching for case variations
+  for (const [mappedName, team] of Object.entries(TEAM_MAPPING)) {
+    if (namesMatch(userName, mappedName)) {
+      return team;
+    }
+  }
+  
+  return 'NA';
+}
+
 // Function to normalize names for matching
 function normalizeName(name) {
   if (!name) return '';
@@ -434,7 +535,8 @@ function mergeMeetingData(trellusRows, meetingData, startDate, endDate, debug = 
       companyName: meeting['Company Name'] || '',
       currentStage: meeting['Current Stage'] || '',
       meetingBookedDate: meeting['Meeting Booked (date of the cold call conversion)'] || '',
-      sourceOfLead: sourceOfLead || ''
+      sourceOfLead: sourceOfLead || '',
+      source: 'google_sheet' // Mark as Google Sheet data
     });
   });
   
@@ -467,9 +569,15 @@ function mergeMeetingData(trellusRows, meetingData, startDate, endDate, debug = 
     
     return {
       ...row,
+      team: getTeamForUser(row.userName),
       values: {
         ...row.values,
         Meeting: totalMeetingCount
+      },
+      meetingCounts: {
+        trellus: originalMeetingCount,
+        googleSheet: additionalMeetings,
+        total: totalMeetingCount
       },
       meetingTimestamps: meetingTimestamps.sort((a, b) => {
         const dateA = parseTimestamp(a.timestamp);

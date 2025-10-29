@@ -8,11 +8,19 @@ interface MeetingTimestamp {
   currentStage: string;
   meetingBookedDate: string;
   sourceOfLead: string;
+  source: 'trellus' | 'google_sheet';
+}
+
+interface MeetingCounts {
+  trellus: number;
+  googleSheet: number;
+  total: number;
 }
 
 interface MetricRow {
   userId: string;
   userName: string;
+  team: string;
   values: {
     Dial: number;
     Connect: number;
@@ -21,6 +29,7 @@ interface MetricRow {
     Meeting: number;
   };
   meetingTimestamps?: MeetingTimestamp[];
+  meetingCounts?: MeetingCounts;
 }
 
 interface MetricsData {
@@ -31,7 +40,7 @@ interface MetricsData {
   };
 }
 
-type SortColumn = 'name' | 'dial' | 'connect' | 'pitch' | 'conversation' | 'meeting';
+type SortColumn = 'name' | 'team' | 'dial' | 'connect' | 'pitch' | 'conversation' | 'meeting';
 type SortDirection = 'asc' | 'desc';
 
 interface AIQueryResponse {
@@ -150,6 +159,10 @@ function App() {
           aValue = a.userName.toLowerCase();
           bValue = b.userName.toLowerCase();
           break;
+        case 'team':
+          aValue = a.team.toLowerCase();
+          bValue = b.team.toLowerCase();
+          break;
         case 'dial':
           aValue = a.values.Dial;
           bValue = b.values.Dial;
@@ -191,7 +204,7 @@ function App() {
 
   const formatTimestamp = (timestamp: string) => {
     try {
-      const [datePart, timePart] = timestamp.split(' ');
+      const [datePart] = timestamp.split(' ');
       const [month, day, year] = datePart.split('/');
       const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
       return date.toLocaleDateString('en-US', {
@@ -463,6 +476,21 @@ function App() {
                       )}
                     </button>
                   </th>
+                  <th className="text-left px-6 py-4">
+                    <button
+                      onClick={() => handleSort('team')}
+                      className="flex items-center gap-2 hover:text-slate-700 transition-colors"
+                    >
+                      <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                        Team
+                      </span>
+                      {sortColumn === 'team' && (
+                        sortDirection === 'asc' ? 
+                          <ChevronUp className="w-3 h-3" /> : 
+                          <ChevronDown className="w-3 h-3" />
+                      )}
+                    </button>
+                  </th>
                   <th className="text-right px-6 py-4">
                     <button
                       onClick={() => handleSort('dial')}
@@ -568,6 +596,34 @@ function App() {
                         </div>
                       </td>
                       <td className="px-6 py-4">
+                        <div className="text-left">
+                          {(() => {
+                            const getTeamBadgeStyle = (team: string) => {
+                              switch (team) {
+                                case 'Botzilla':
+                                  return 'bg-purple-100 text-purple-800';
+                                case 'Alphabots':
+                                  return 'bg-blue-100 text-blue-800';
+                                case 'Cloudtech':
+                                  return 'bg-green-100 text-green-800';
+                                case 'KnowcloudAI':
+                                  return 'bg-orange-100 text-orange-800';
+                                case 'Hyperflex':
+                                  return 'bg-pink-100 text-pink-800';
+                                default:
+                                  return 'bg-gray-100 text-gray-600';
+                              }
+                            };
+                            
+                            return (
+                              <span className={`px-2 py-1 rounded-full text-xs font-medium ${getTeamBadgeStyle(row.team)}`}>
+                                {row.team}
+                              </span>
+                            );
+                          })()}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
                         <div className="text-right">
                           <span className={`text-sm font-medium ${hasActivity ? 'text-slate-700' : 'text-slate-400'}`}>
                             {row.values.Dial}
@@ -635,9 +691,19 @@ function App() {
                   <h3 className="text-lg font-semibold text-slate-900">
                     Meeting Details - {selectedUser.userName}
                   </h3>
-                  <p className="text-sm text-slate-600 mt-1">
-                    {selectedUser.values.Meeting} meeting{selectedUser.values.Meeting !== 1 ? 's' : ''} found
-                  </p>
+                  <div className="text-sm text-slate-600 mt-1 space-y-1">
+                    <p>{selectedUser.values.Meeting} meeting{selectedUser.values.Meeting !== 1 ? 's' : ''} found</p>
+                    {selectedUser.meetingCounts && (
+                      <div className="flex gap-4 text-xs">
+                        <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full">
+                          Trellus: {selectedUser.meetingCounts.trellus}
+                        </span>
+                        <span className="bg-green-100 text-green-800 px-2 py-1 rounded-full">
+                          Manual Entry: {selectedUser.meetingCounts.googleSheet}
+                        </span>
+                      </div>
+                    )}
+                  </div>
                 </div>
                 <button
                   onClick={() => setShowMeetingModal(false)}
