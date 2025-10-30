@@ -147,9 +147,10 @@ function App() {
   const getSortedData = () => {
     if (!data) return [];
     
-    // Filter by search term only
+    // Filter by search term and only show Alphabots and Botzilla teams
     const filteredRows = data.rows.filter(row => 
-      row.userName.toLowerCase().includes(searchTerm.toLowerCase())
+      row.userName.toLowerCase().includes(searchTerm.toLowerCase()) &&
+      (row.team === 'Alphabots' || row.team === 'Botzilla')
     );
     
     const sortedRows = [...filteredRows].sort((a, b) => {
@@ -292,7 +293,7 @@ function App() {
                   </div>
                   <div>
                     <p className="text-sm font-medium text-blue-900">Total Users</p>
-                    <p className="text-xs text-blue-600">{data ? data.rows.length : 0}</p>
+                    <p className="text-xs text-blue-600">{data ? data.rows.filter(row => row.team === 'Alphabots' || row.team === 'Botzilla').length : 0}</p>
                   </div>
                 </div>
               </div>
@@ -304,7 +305,7 @@ function App() {
                   </div>
                   <div>
                     <p className="text-sm font-medium text-green-900">Total Meetings</p>
-                    <p className="text-xs text-green-600">{data ? data.rows.reduce((sum, row) => sum + row.values.Meeting, 0) : 0}</p>
+                    <p className="text-xs text-green-600">{data ? data.rows.filter(row => row.team === 'Alphabots' || row.team === 'Botzilla').reduce((sum, row) => sum + row.values.Meeting, 0) : 0}</p>
                   </div>
                 </div>
               </div>
@@ -350,7 +351,7 @@ function App() {
           <div className="space-y-3">
             <h3 className="text-sm font-medium text-gray-700">Teams</h3>
             <div className="space-y-1">
-              {data && [...new Set(data.rows.map(row => row.team))].map(team => {
+              {data && [...new Set(data.rows.map(row => row.team))].filter(team => team === 'Alphabots' || team === 'Botzilla').map(team => {
                 const getTeamColor = (teamName: string) => {
                   switch (teamName) {
                     case 'Botzilla': return 'bg-purple-100 text-purple-700';
@@ -366,7 +367,7 @@ function App() {
                     <div className={`w-3 h-3 rounded-full ${getTeamColor(team).split(' ')[0]}`}></div>
                     <span className="text-sm text-gray-700">{team}</span>
                     <span className="ml-auto text-xs text-gray-500">
-                      {data.rows.filter(row => row.team === team).length}
+                      {data.rows.filter(row => row.team === team && (row.team === 'Alphabots' || row.team === 'Botzilla')).length}
                     </span>
                   </div>
                 );
@@ -748,19 +749,6 @@ function App() {
                           </div>
                         </div>
                         
-                        <div>
-                          <div className="text-sm font-medium text-gray-700 mb-1">Lead Contact</div>
-                          <div className="text-sm text-gray-900">
-                            {meeting.leadName || 'N/A'}
-                          </div>
-                        </div>
-                        
-                        <div>
-                          <div className="text-sm font-medium text-gray-700 mb-1">Company</div>
-                          <div className="text-sm text-gray-900">
-                            {meeting.companyName || 'N/A'}
-                          </div>
-                        </div>
                         
                         <div>
                           <div className="text-sm font-medium text-gray-700 mb-1">Source of Lead</div>
