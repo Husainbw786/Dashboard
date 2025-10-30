@@ -63,6 +63,7 @@ function App() {
   const [endDate, setEndDate] = useState('');
   const [sortColumn, setSortColumn] = useState<SortColumn>('name');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
+  const [searchTerm, setSearchTerm] = useState('');
   
   // AI Query states
   const [aiQuery, setAiQuery] = useState('');
@@ -146,7 +147,12 @@ function App() {
   const getSortedData = () => {
     if (!data) return [];
     
-    const sortedRows = [...data.rows].sort((a, b) => {
+    // Filter by search term only
+    const filteredRows = data.rows.filter(row => 
+      row.userName.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+    
+    const sortedRows = [...filteredRows].sort((a, b) => {
       let aValue: string | number;
       let bValue: string | number;
       
@@ -256,18 +262,19 @@ function App() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex">
+    <div className="h-screen bg-gray-50 flex overflow-hidden">
       {/* Left Sidebar */}
-      <div className="w-64 bg-white border-r border-gray-200 flex flex-col">
+      <div className="w-64 bg-white border-r border-gray-200 flex flex-col h-full">
         {/* Sidebar Header */}
-        <div className="p-4 border-b border-gray-200">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center">
-              <BarChart3 className="w-5 h-5 text-white" />
+        <div className="p-6 border-b border-gray-200">
+          <div className="flex items-center gap-4">
+            <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center shadow-lg">
+              <BarChart3 className="w-6 h-6 text-white" />
             </div>
             <div>
-              <h1 className="text-lg font-semibold text-gray-900">Metrics</h1>
-              <p className="text-xs text-gray-500">Dashboard</p>
+              <h1 className="text-xl font-bold text-gray-900 tracking-tight">Performance</h1>
+              <h2 className="text-xl font-bold text-blue-600 tracking-tight -mt-1">Insights</h2>
+              <p className="text-xs text-gray-500 mt-1 font-medium">Analytics Dashboard</p>
             </div>
           </div>
         </div>
@@ -365,27 +372,27 @@ function App() {
                 );
               })}
             </div>
+            {/* Refresh Button */}
+            <div className="mt-4">
+              <button
+                onClick={() => fetchMetrics()}
+                className="w-full flex items-center justify-center gap-2 p-2 bg-blue-500 text-white text-sm font-medium rounded-lg hover:bg-blue-600 transition-colors"
+              >
+                <RefreshCw className="w-4 h-4" />
+                Refresh Data
+              </button>
+            </div>
           </div>
-        </div>
-
-        {/* Sidebar Footer */}
-        <div className="p-4 border-t border-gray-200">
-          <button
-            onClick={() => fetchMetrics()}
-            className="w-full flex items-center justify-center gap-2 p-2 bg-blue-500 text-white text-sm font-medium rounded-lg hover:bg-blue-600 transition-colors"
-          >
-            <RefreshCw className="w-4 h-4" />
-            Refresh Data
-          </button>
         </div>
       </div>
 
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col">
+      <div className="flex-1 flex flex-col h-full">
         {/* Top Header */}
-        <div className="bg-white border-b border-gray-200 p-4">
+        <div className="bg-white border-b border-gray-200 p-4 flex-shrink-0">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
+              {/* AI Query Bar */}
               <div className="relative flex-1 max-w-md">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
                 <input
@@ -412,24 +419,13 @@ function App() {
               </button>
             </div>
             
-            <div className="flex items-center gap-3">
-              <div className="text-right">
-                <p className="text-sm font-medium text-gray-900">Hi, User</p>
-                <p className="text-xs text-gray-500">
-                  {data ? `${data.dateRange.start} to ${data.dateRange.end}` : 'Loading...'}
-                </p>
-              </div>
-              <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
-                <span className="text-white text-sm font-medium">U</span>
-              </div>
-            </div>
           </div>
         </div>
 
         {/* Content Area */}
-        <div className="flex-1 flex">
+        <div className="flex-1 flex overflow-hidden">
           {/* Main Content */}
-          <div className="flex-1 p-6">
+          <div className="flex-1 p-6 overflow-y-auto">
             {/* Custom Date Range Section */}
             {useCustomDates && (
               <div className="bg-white rounded-lg border border-gray-200 p-4 mb-6">
@@ -490,7 +486,26 @@ function App() {
               <div className="bg-gray-50 border-b border-gray-200 px-6 py-3">
                 <div className="flex items-center justify-between">
                   <h2 className="text-lg font-semibold text-gray-900">Team Performance</h2>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-3">
+                    {/* Name Search Bar */}
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                      <input
+                        type="text"
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        placeholder="Search by name..."
+                        className="w-64 pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      />
+                      {searchTerm && (
+                        <button
+                          onClick={() => setSearchTerm('')}
+                          className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
                     <button className="p-1 hover:bg-gray-200 rounded">
                       <Filter className="w-4 h-4 text-gray-500" />
                     </button>
@@ -557,12 +572,6 @@ function App() {
                           {row.userName.charAt(0).toUpperCase()}
                         </div>
                         <div className="flex items-center gap-2">
-                          {hasActivity && index < 3 && (
-                            <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                          )}
-                          {hasActivity && index >= 3 && index < 10 && (
-                            <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
-                          )}
                           <div>
                             <p className="text-sm font-medium text-gray-900">{row.userName}</p>
                             <p className="text-xs text-gray-500">#{index + 1} performer</p>
@@ -582,13 +591,18 @@ function App() {
                       </div>
                       <div className="w-24 text-center">
                         {row.values.Meeting > 0 ? (
-                          <button
-                            onClick={() => handleMeetingClick(row)}
-                            className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-blue-500 text-white text-sm font-bold hover:bg-blue-600 transition-colors"
-                            title={`Click to view ${row.values.Meeting} meeting details`}
-                          >
-                            {row.values.Meeting}
-                          </button>
+                          <div className="flex items-center justify-center gap-2">
+                            <span className="text-sm font-medium text-gray-900">
+                              {row.values.Meeting}
+                            </span>
+                            <button
+                              onClick={() => handleMeetingClick(row)}
+                              className="inline-flex items-center justify-center w-6 h-6 rounded-md bg-blue-100 text-blue-600 hover:bg-blue-200 transition-colors group"
+                              title={`View ${row.values.Meeting} meeting details`}
+                            >
+                              <MessageSquare className="w-3 h-3" />
+                            </button>
+                          </div>
                         ) : (
                           <span className="text-sm font-medium text-gray-400">
                             {row.values.Meeting}
