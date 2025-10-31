@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ChevronUp, ChevronDown, RefreshCw, Calendar, MessageSquare, Send, Loader2 } from 'lucide-react';
+import { ChevronUp, ChevronDown, RefreshCw, Calendar, MessageSquare, Loader2, Search, BarChart3, Users, Clock, TrendingUp, Filter, X } from 'lucide-react';
 
 interface MeetingTimestamp {
   timestamp: string;
@@ -63,6 +63,7 @@ function App() {
   const [endDate, setEndDate] = useState('');
   const [sortColumn, setSortColumn] = useState<SortColumn>('name');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
+  const [searchTerm, setSearchTerm] = useState('');
   
   // AI Query states
   const [aiQuery, setAiQuery] = useState('');
@@ -131,10 +132,6 @@ function App() {
     }
   };
 
-  const handleAIQuerySubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    handleAIQuery();
-  };
 
   const handleSort = (column: SortColumn) => {
     if (sortColumn === column) {
@@ -150,7 +147,13 @@ function App() {
   const getSortedData = () => {
     if (!data) return [];
     
-    const sortedRows = [...data.rows].sort((a, b) => {
+    // Filter by search term and only show Alphabots and Botzilla teams
+    const filteredRows = data.rows.filter(row => 
+      row.userName.toLowerCase().includes(searchTerm.toLowerCase()) &&
+      (row.team === 'Alphabots' || row.team === 'Botzilla')
+    );
+    
+    const sortedRows = [...filteredRows].sort((a, b) => {
       let aValue: string | number;
       let bValue: string | number;
       
@@ -260,424 +263,436 @@ function App() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <div className="max-w-7xl mx-auto p-6">
-        <div className="mb-6">
-          <div className="flex items-center justify-between mb-4">
+    <div className="h-screen bg-gray-50 flex overflow-hidden">
+      {/* Left Sidebar */}
+      <div className="w-64 bg-white border-r border-gray-200 flex flex-col h-full">
+        {/* Sidebar Header */}
+        <div className="p-6 border-b border-gray-200">
+          <div className="flex items-center gap-4">
+            <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center shadow-lg">
+              <BarChart3 className="w-6 h-6 text-white" />
+            </div>
             <div>
-              <h1 className="text-2xl font-semibold text-slate-900">Metrics Dashboard</h1>
-              <p className="text-sm text-slate-600 mt-1">
-                {data.dateRange.start} to {data.dateRange.end}
-              </p>
+              <h1 className="text-xl font-bold text-gray-900 tracking-tight">Performance</h1>
+              <h2 className="text-xl font-bold text-blue-600 tracking-tight -mt-1">Insights</h2>
+              <p className="text-xs text-gray-500 mt-1 font-medium">Analytics Dashboard</p>
             </div>
-            <button
-              onClick={() => fetchMetrics()}
-              className="flex items-center gap-2 px-4 py-2 bg-white text-slate-700 text-sm font-medium rounded-md border border-slate-200 hover:bg-slate-50 transition-colors"
-            >
-              <RefreshCw className="w-4 h-4" />
-              Refresh
-            </button>
-          </div>
-          
-          {/* Date Range Controls */}
-          <div className="bg-white rounded-lg border border-slate-200 p-4">
-            <div className="flex items-center gap-4 mb-4">
-              <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={useCustomDates}
-                  onChange={(e) => setUseCustomDates(e.target.checked)}
-                  className="rounded border-slate-300"
-                />
-                <Calendar className="w-4 h-4 text-slate-500" />
-                <span className="text-sm font-medium text-slate-700">Custom Date Range</span>
-              </label>
-            </div>
-            
-            {useCustomDates && (
-              <div className="flex items-center gap-4">
-                <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1">Start Date</label>
-                  <input
-                    type="date"
-                    value={startDate}
-                    onChange={(e) => setStartDate(e.target.value)}
-                    className="px-3 py-2 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1">End Date</label>
-                  <input
-                    type="date"
-                    value={endDate}
-                    onChange={(e) => setEndDate(e.target.value)}
-                    className="px-3 py-2 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  />
-                </div>
-                <div className="mt-5">
-                  <button
-                    onClick={handleDateRangeSubmit}
-                    disabled={!startDate || !endDate}
-                    className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 disabled:bg-slate-300 disabled:cursor-not-allowed transition-colors"
-                  >
-                    Apply Range
-                  </button>
-                </div>
-              </div>
-            )}
-            
-            {!useCustomDates && (
-              <div className="flex gap-2">
-                <button
-                  onClick={() => handleQuickDateRange(1)}
-                  className="px-3 py-1 text-xs font-medium bg-slate-100 text-slate-700 rounded-md hover:bg-slate-200 transition-colors"
-                >
-                  Today
-                </button>
-                <button
-                  onClick={() => handleQuickDateRange(7)}
-                  className="px-3 py-1 text-xs font-medium bg-slate-100 text-slate-700 rounded-md hover:bg-slate-200 transition-colors"
-                >
-                  Last 7 Days
-                </button>
-                <button
-                  onClick={() => handleQuickDateRange(30)}
-                  className="px-3 py-1 text-xs font-medium bg-slate-100 text-slate-700 rounded-md hover:bg-slate-200 transition-colors"
-                >
-                  Last 30 Days
-                </button>
-              </div>
-            )}
           </div>
         </div>
 
-        {/* AI Query Section */}
-        <div className="bg-white rounded-lg border border-slate-200 p-6 mb-6">
-          <div className="flex items-center gap-3 mb-4">
-            <MessageSquare className="w-5 h-5 text-blue-600" />
-            <h2 className="text-lg font-semibold text-slate-900">Ask AI about your metrics</h2>
+        {/* Navigation */}
+        <div className="flex-1 p-4 space-y-6">
+          {/* Quick Stats */}
+          <div className="space-y-3">
+            <h3 className="text-sm font-medium text-gray-700">Overview</h3>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg border border-blue-100">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center">
+                    <Users className="w-4 h-4 text-white" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-blue-900">Total Users</p>
+                    <p className="text-xs text-blue-600">{data ? data.rows.filter(row => row.team === 'Alphabots' || row.team === 'Botzilla').length : 0}</p>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg border border-green-100">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 bg-green-500 rounded-lg flex items-center justify-center">
+                    <TrendingUp className="w-4 h-4 text-white" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-green-900">Total Meetings</p>
+                    <p className="text-xs text-green-600">{data ? data.rows.filter(row => row.team === 'Alphabots' || row.team === 'Botzilla').reduce((sum, row) => sum + row.values.Meeting, 0) : 0}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
-          
-          <form onSubmit={handleAIQuerySubmit} className="space-y-4">
-            <div className="flex gap-3">
-              <input
-                type="text"
-                value={aiQuery}
-                onChange={(e) => setAiQuery(e.target.value)}
-                placeholder="Ask anything about your metrics... e.g., 'Who made the most dials last week?' or 'Show me top performers this month'"
-                className="flex-1 px-4 py-3 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                disabled={aiLoading}
-              />
+
+          {/* Quick Actions */}
+          <div className="space-y-3">
+            <h3 className="text-sm font-medium text-gray-700">Quick Actions</h3>
+            <div className="space-y-1">
               <button
-                type="submit"
-                disabled={aiLoading || !aiQuery.trim()}
-                className="px-6 py-3 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:bg-slate-300 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+                onClick={() => handleQuickDateRange(1)}
+                className="w-full flex items-center gap-3 p-2 text-sm text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
               >
-                {aiLoading ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Processing...
-                  </>
-                ) : (
-                  <>
-                    <Send className="w-4 h-4" />
-                    Ask AI
-                  </>
-                )}
+                <Clock className="w-4 h-4" />
+                Today
+              </button>
+              <button
+                onClick={() => handleQuickDateRange(7)}
+                className="w-full flex items-center gap-3 p-2 text-sm text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                <Calendar className="w-4 h-4" />
+                Last 7 Days
+              </button>
+              <button
+                onClick={() => handleQuickDateRange(30)}
+                className="w-full flex items-center gap-3 p-2 text-sm text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                <Calendar className="w-4 h-4" />
+                Last 30 Days
+              </button>
+              <button
+                onClick={() => setUseCustomDates(!useCustomDates)}
+                className="w-full flex items-center gap-3 p-2 text-sm text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                <Filter className="w-4 h-4" />
+                Custom Range
               </button>
             </div>
-          </form>
+          </div>
 
-          {aiError && (
-            <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg">
-              <p className="text-red-700 text-sm">{aiError}</p>
-            </div>
-          )}
-
-          {aiResponse && (
-            <div className="mt-6 space-y-4">
-              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-6 shadow-sm">
-                <div className="flex items-start gap-4">
-                  <div className="flex-shrink-0 w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                    <MessageSquare className="w-5 h-5 text-blue-600" />
+          {/* Team Filters */}
+          <div className="space-y-3">
+            <h3 className="text-sm font-medium text-gray-700">Teams</h3>
+            <div className="space-y-1">
+              {data && [...new Set(data.rows.map(row => row.team))].filter(team => team === 'Alphabots' || team === 'Botzilla').map(team => {
+                const getTeamColor = (teamName: string) => {
+                  switch (teamName) {
+                    case 'Botzilla': return 'bg-purple-100 text-purple-700';
+                    case 'Alphabots': return 'bg-blue-100 text-blue-700';
+                    case 'Cloudtech': return 'bg-green-100 text-green-700';
+                    case 'KnowcloudAI': return 'bg-orange-100 text-orange-700';
+                    case 'Hyperflex': return 'bg-pink-100 text-pink-700';
+                    default: return 'bg-gray-100 text-gray-700';
+                  }
+                };
+                return (
+                  <div key={team} className="flex items-center gap-2 p-2 hover:bg-gray-50 rounded-lg">
+                    <div className={`w-3 h-3 rounded-full ${getTeamColor(team).split(' ')[0]}`}></div>
+                    <span className="text-sm text-gray-700">{team}</span>
+                    <span className="ml-auto text-xs text-gray-500">
+                      {data.rows.filter(row => row.team === team && (row.team === 'Alphabots' || row.team === 'Botzilla')).length}
+                    </span>
                   </div>
-                  <div className="flex-1 space-y-4">
-                    {/* Query Header */}
-                    <div className="bg-white rounded-lg p-4 border border-blue-100">
-                      <div className="text-sm font-medium text-blue-800 mb-1">
-                        💬 Your Question
-                      </div>
-                      <div className="text-base text-slate-800 font-medium">
-                        "{aiResponse.query}"
-                      </div>
-                    </div>
+                );
+              })}
+            </div>
+            {/* Refresh Button */}
+            <div className="mt-4">
+              <button
+                onClick={() => fetchMetrics()}
+                className="w-full flex items-center justify-center gap-2 p-2 bg-blue-500 text-white text-sm font-medium rounded-lg hover:bg-blue-600 transition-colors"
+              >
+                <RefreshCw className="w-4 h-4" />
+                Refresh Data
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
 
-                    {/* Metadata */}
-                    <div className="flex flex-wrap gap-3 text-xs">
-                      <div className="bg-white px-3 py-1 rounded-full border border-blue-100">
-                        📅 {aiResponse.dateRange.start} to {aiResponse.dateRange.end}
-                      </div>
-                      <div className="bg-white px-3 py-1 rounded-full border border-blue-100">
-                        🎯 {aiResponse.intent}
-                      </div>
-                    </div>
+      {/* Main Content Area */}
+      <div className="flex-1 flex flex-col h-full">
+        {/* Top Header */}
+        <div className="bg-white border-b border-gray-200 p-4 flex-shrink-0">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              {/* AI Query Bar */}
+              <div className="relative flex-1 max-w-md">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <input
+                  type="text"
+                  value={aiQuery}
+                  onChange={(e) => setAiQuery(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && handleAIQuery()}
+                  placeholder="Ask AI about your metrics..."
+                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  disabled={aiLoading}
+                />
+              </div>
+              <button
+                onClick={handleAIQuery}
+                disabled={aiLoading || !aiQuery.trim()}
+                className="px-4 py-2 bg-blue-500 text-white text-sm font-medium rounded-lg hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+              >
+                {aiLoading ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <MessageSquare className="w-4 h-4" />
+                )}
+                {aiLoading ? 'Processing...' : 'Ask AI'}
+              </button>
+            </div>
+            
+          </div>
+        </div>
 
-                    {/* AI Answer */}
-                    <div className="bg-white rounded-lg p-4 border border-blue-100">
-                      <div className="text-sm font-medium text-blue-800 mb-3 flex items-center gap-2">
-                        🤖 AI Analysis
-                      </div>
-                      <div className="text-sm text-slate-700 leading-relaxed space-y-2">
-                        {typeof aiResponse.answer === 'string' 
-                          ? aiResponse.answer.split('\n').map((line, lineIndex) => (
-                              <div key={lineIndex}>
-                                {line.split(/(\*\*.*?\*\*)/).map((part, partIndex) => {
-                                  if (part.startsWith('**') && part.endsWith('**')) {
-                                    return (
-                                      <span key={partIndex} className="font-semibold text-slate-900 bg-yellow-100 px-1 rounded">
-                                        {part.slice(2, -2)}
-                                      </span>
-                                    );
-                                  }
-                                  return <span key={partIndex}>{part}</span>;
-                                })}
-                              </div>
-                            ))
-                          : <pre className="text-xs bg-slate-50 p-3 rounded overflow-auto">
-                              {JSON.stringify(aiResponse.answer, null, 2)}
-                            </pre>
-                        }
-                      </div>
-                    </div>
+        {/* Content Area */}
+        <div className="flex-1 flex overflow-hidden">
+          {/* Main Content */}
+          <div className="flex-1 p-6 overflow-y-auto">
+            {/* Custom Date Range Section */}
+            {useCustomDates && (
+              <div className="bg-white rounded-lg border border-gray-200 p-4 mb-6">
+                <div className="flex items-center gap-4 mb-4">
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={useCustomDates}
+                      onChange={(e) => setUseCustomDates(e.target.checked)}
+                      className="rounded border-gray-300"
+                    />
+                    <Calendar className="w-4 h-4 text-gray-500" />
+                    <span className="text-sm font-medium text-gray-700">Custom Date Range</span>
+                  </label>
+                </div>
+                
+                <div className="flex items-center gap-4">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Start Date</label>
+                    <input
+                      type="date"
+                      value={startDate}
+                      onChange={(e) => setStartDate(e.target.value)}
+                      className="px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">End Date</label>
+                    <input
+                      type="date"
+                      value={endDate}
+                      onChange={(e) => setEndDate(e.target.value)}
+                      className="px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+                  <div className="mt-5">
+                    <button
+                      onClick={handleDateRangeSubmit}
+                      disabled={!startDate || !endDate}
+                      className="px-4 py-2 bg-blue-500 text-white text-sm font-medium rounded-md hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+                    >
+                      Apply Range
+                    </button>
                   </div>
                 </div>
               </div>
-            </div>
-          )}
-        </div>
+            )}
 
-        <div className="bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="bg-slate-50 border-b border-slate-200">
-                  <th className="text-left px-6 py-4">
+            {aiError && (
+              <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+                <p className="text-red-700 text-sm">{aiError}</p>
+              </div>
+            )}
+
+            {/* Metrics Table - Dropbox Style */}
+            <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+              {/* Table Header */}
+              <div className="bg-gray-50 border-b border-gray-200 px-6 py-3">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-lg font-semibold text-gray-900">Team Performance</h2>
+                  <div className="flex items-center gap-3">
+                    {/* Name Search Bar */}
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                      <input
+                        type="text"
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        placeholder="Search by name..."
+                        className="w-64 pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      />
+                      {searchTerm && (
+                        <button
+                          onClick={() => setSearchTerm('')}
+                          className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
+                    <button className="p-1 hover:bg-gray-200 rounded">
+                      <Filter className="w-4 h-4 text-gray-500" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+              
+              {/* File List Style Table */}
+              <div className="divide-y divide-gray-100">
+                {/* Table Header Row */}
+                <div className="flex items-center px-6 py-2 text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50 border-b border-gray-100">
+                  <div className="flex-1">
                     <button
                       onClick={() => handleSort('name')}
-                      className="flex items-center gap-2 hover:text-slate-700 transition-colors"
+                      className="flex items-center gap-2 hover:text-gray-700 transition-colors"
                     >
-                      <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                        Name
-                      </span>
+                      Name
                       {sortColumn === 'name' && (
                         sortDirection === 'asc' ? 
                           <ChevronUp className="w-3 h-3" /> : 
                           <ChevronDown className="w-3 h-3" />
                       )}
                     </button>
-                  </th>
-                  <th className="text-left px-6 py-4">
-                    <button
-                      onClick={() => handleSort('team')}
-                      className="flex items-center gap-2 hover:text-slate-700 transition-colors"
-                    >
-                      <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                        Team
-                      </span>
-                      {sortColumn === 'team' && (
-                        sortDirection === 'asc' ? 
-                          <ChevronUp className="w-3 h-3" /> : 
-                          <ChevronDown className="w-3 h-3" />
-                      )}
+                  </div>
+                  <div className="w-24 text-center">
+                    <button onClick={() => handleSort('dial')} className="hover:text-gray-700">
+                      Dials
                     </button>
-                  </th>
-                  <th className="text-right px-6 py-4">
-                    <button
-                      onClick={() => handleSort('dial')}
-                      className="flex items-center gap-2 ml-auto hover:text-slate-700 transition-colors"
-                    >
-                      <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                        Dial
-                      </span>
-                      {sortColumn === 'dial' && (
-                        sortDirection === 'asc' ? 
-                          <ChevronUp className="w-3 h-3" /> : 
-                          <ChevronDown className="w-3 h-3" />
-                      )}
+                  </div>
+                  <div className="w-24 text-center">
+                    <button onClick={() => handleSort('connect')} className="hover:text-gray-700">
+                      Connects
                     </button>
-                  </th>
-                  <th className="text-right px-6 py-4">
-                    <button
-                      onClick={() => handleSort('connect')}
-                      className="flex items-center gap-2 ml-auto hover:text-slate-700 transition-colors"
-                    >
-                      <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                        Connect
-                      </span>
-                      {sortColumn === 'connect' && (
-                        sortDirection === 'asc' ? 
-                          <ChevronUp className="w-3 h-3" /> : 
-                          <ChevronDown className="w-3 h-3" />
-                      )}
+                  </div>
+                  <div className="w-24 text-center">
+                    <button onClick={() => handleSort('meeting')} className="hover:text-gray-700">
+                      Meetings
                     </button>
-                  </th>
-                  <th className="text-right px-6 py-4">
-                    <button
-                      onClick={() => handleSort('pitch')}
-                      className="flex items-center gap-2 ml-auto hover:text-slate-700 transition-colors"
-                    >
-                      <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                        Pitch
-                      </span>
-                      {sortColumn === 'pitch' && (
-                        sortDirection === 'asc' ? 
-                          <ChevronUp className="w-3 h-3" /> : 
-                          <ChevronDown className="w-3 h-3" />
-                      )}
-                    </button>
-                  </th>
-                  <th className="text-right px-6 py-4">
-                    <button
-                      onClick={() => handleSort('conversation')}
-                      className="flex items-center gap-2 ml-auto hover:text-slate-700 transition-colors"
-                    >
-                      <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                        Conv
-                      </span>
-                      {sortColumn === 'conversation' && (
-                        sortDirection === 'asc' ? 
-                          <ChevronUp className="w-3 h-3" /> : 
-                          <ChevronDown className="w-3 h-3" />
-                      )}
-                    </button>
-                  </th>
-                  <th className="text-right px-6 py-4">
-                    <button
-                      onClick={() => handleSort('meeting')}
-                      className="flex items-center gap-2 ml-auto hover:text-slate-700 transition-colors"
-                    >
-                      <span className="text-xs font-semibold text-orange-500 uppercase tracking-wider">
-                        Meet
-                      </span>
-                      {sortColumn === 'meeting' && (
-                        sortDirection === 'asc' ? 
-                          <ChevronUp className="w-3 h-3" /> : 
-                          <ChevronDown className="w-3 h-3" />
-                      )}
-                    </button>
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
+                  </div>
+                  <div className="w-32 text-center">Team</div>
+                </div>
+                {/* Table Rows */}
                 {getSortedData().map((row, index) => {
                   const hasActivity = row.values.Dial > 0;
+                  const getTeamBadgeStyle = (team: string) => {
+                    switch (team) {
+                      case 'Botzilla': return 'bg-purple-100 text-purple-800 border-purple-200';
+                      case 'Alphabots': return 'bg-blue-100 text-blue-800 border-blue-200';
+                      case 'Cloudtech': return 'bg-green-100 text-green-800 border-green-200';
+                      case 'KnowcloudAI': return 'bg-orange-100 text-orange-800 border-orange-200';
+                      case 'Hyperflex': return 'bg-pink-100 text-pink-800 border-pink-200';
+                      default: return 'bg-gray-100 text-gray-600 border-gray-200';
+                    }
+                  };
 
                   return (
-                    <tr
+                    <div
                       key={row.userId}
-                      className="hover:bg-slate-50 transition-colors"
+                      className="flex items-center px-6 py-4 hover:bg-gray-50 transition-colors cursor-pointer"
                     >
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-3">
-                          <div className="flex items-center justify-center w-8 h-8 rounded-full bg-slate-100 text-slate-600 text-xs font-medium">
-                            {index + 1}
+                      {/* User Info */}
+                      <div className="flex-1 flex items-center gap-3">
+                        <div className="flex items-center justify-center w-8 h-8 rounded-full bg-blue-100 text-blue-600 text-xs font-medium">
+                          {row.userName.charAt(0).toUpperCase()}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div>
+                            <p className="text-sm font-medium text-gray-900">{row.userName}</p>
+                            <p className="text-xs text-gray-500">#{index + 1} performer</p>
                           </div>
-                          <div className="flex items-center gap-2">
-                            {hasActivity && index < 3 && (
-                              <ChevronUp className="w-4 h-4 text-green-500" />
-                            )}
-                            {hasActivity && index >= 3 && index < 10 && (
-                              <ChevronDown className="w-4 h-4 text-red-500" />
-                            )}
-                            <span className="text-sm font-medium text-slate-900">
-                              {row.userName}
+                        </div>
+                      </div>
+                      {/* Metrics */}
+                      <div className="w-24 text-center">
+                        <span className={`text-sm font-medium ${hasActivity ? 'text-gray-900' : 'text-gray-400'}`}>
+                          {row.values.Dial}
+                        </span>
+                      </div>
+                      <div className="w-24 text-center">
+                        <span className={`text-sm font-medium ${hasActivity ? 'text-gray-900' : 'text-gray-400'}`}>
+                          {row.values.Connect}
+                        </span>
+                      </div>
+                      <div className="w-24 text-center">
+                        {row.values.Meeting > 0 ? (
+                          <div className="flex items-center justify-center gap-2">
+                            <span className="text-sm font-medium text-gray-900">
+                              {row.values.Meeting}
                             </span>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="text-left">
-                          {(() => {
-                            const getTeamBadgeStyle = (team: string) => {
-                              switch (team) {
-                                case 'Botzilla':
-                                  return 'bg-purple-100 text-purple-800';
-                                case 'Alphabots':
-                                  return 'bg-blue-100 text-blue-800';
-                                case 'Cloudtech':
-                                  return 'bg-green-100 text-green-800';
-                                case 'KnowcloudAI':
-                                  return 'bg-orange-100 text-orange-800';
-                                case 'Hyperflex':
-                                  return 'bg-pink-100 text-pink-800';
-                                default:
-                                  return 'bg-gray-100 text-gray-600';
-                              }
-                            };
-                            
-                            return (
-                              <span className={`px-2 py-1 rounded-full text-xs font-medium ${getTeamBadgeStyle(row.team)}`}>
-                                {row.team}
-                              </span>
-                            );
-                          })()}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="text-right">
-                          <span className={`text-sm font-medium ${hasActivity ? 'text-slate-700' : 'text-slate-400'}`}>
-                            {row.values.Dial}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="text-right">
-                          <span className={`text-sm font-medium ${hasActivity ? 'text-slate-700' : 'text-slate-400'}`}>
-                            {row.values.Connect}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="text-right">
-                          <span className={`text-sm font-medium ${hasActivity ? 'text-slate-700' : 'text-slate-400'}`}>
-                            {row.values.Pitch}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="text-right">
-                          <span className={`text-sm font-medium ${hasActivity ? 'text-slate-700' : 'text-slate-400'}`}>
-                            {row.values.Conversation}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="text-right">
-                          {row.values.Meeting > 0 ? (
                             <button
                               onClick={() => handleMeetingClick(row)}
-                              className="inline-flex items-center justify-center w-8 h-8 rounded-md bg-slate-900 text-white text-sm font-bold hover:bg-slate-700 transition-colors cursor-pointer"
-                              title={`Click to view ${row.values.Meeting} meeting details`}
+                              className="inline-flex items-center justify-center w-6 h-6 rounded-md bg-blue-100 text-blue-600 hover:bg-blue-200 transition-colors group"
+                              title={`View ${row.values.Meeting} meeting details`}
                             >
-                              {row.values.Meeting}
+                              <MessageSquare className="w-3 h-3" />
                             </button>
-                          ) : (
-                            <span className="text-sm font-medium text-slate-400">
-                              {row.values.Meeting}
-                            </span>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
+                          </div>
+                        ) : (
+                          <span className="text-sm font-medium text-gray-400">
+                            {row.values.Meeting}
+                          </span>
+                        )}
+                      </div>
+                      <div className="w-32 text-center">
+                        <span className={`px-2 py-1 rounded-full text-xs font-medium border ${getTeamBadgeStyle(row.team)}`}>
+                          {row.team}
+                        </span>
+                      </div>
+                    </div>
                   );
                 })}
-              </tbody>
-            </table>
+              </div>
+              
+              {/* Footer */}
+              <div className="bg-gray-50 px-6 py-3 border-t border-gray-200">
+                <p className="text-xs text-gray-500">
+                  Showing {getSortedData().length} users • Updated {new Date().toLocaleTimeString()}
+                </p>
+              </div>
+            </div>
           </div>
-        </div>
 
-        <div className="mt-4 text-center text-xs text-slate-500">
-          Showing {getSortedData().length} users
+          {/* Right Activity Panel */}
+          <div className="w-80 bg-white border-l border-gray-200 flex flex-col">
+            <div className="p-4 border-b border-gray-200">
+              <h3 className="text-lg font-semibold text-gray-900">Activity</h3>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto">
+              {aiResponse && (
+                <div className="p-4 space-y-4">
+                  <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
+                    <div className="flex items-start gap-3">
+                      <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center flex-shrink-0">
+                        <MessageSquare className="w-4 h-4 text-white" />
+                      </div>
+                      <div className="flex-1 space-y-3">
+                        <div className="bg-white rounded-lg p-3 border border-blue-100">
+                          <p className="text-xs font-medium text-blue-800 mb-1">💬 Your Question</p>
+                          <p className="text-sm text-gray-800 font-medium">"{aiResponse.query}"</p>
+                        </div>
+                        
+                        <div className="flex gap-2 text-xs">
+                          <span className="bg-white px-2 py-1 rounded-full border border-blue-100">
+                            📅 {aiResponse.dateRange.start} to {aiResponse.dateRange.end}
+                          </span>
+                        </div>
+                        
+                        <div className="bg-white rounded-lg p-3 border border-blue-100">
+                          <p className="text-xs font-medium text-blue-800 mb-2">🤖 AI Analysis</p>
+                          <div className="text-sm text-gray-700 leading-relaxed space-y-1">
+                            {typeof aiResponse.answer === 'string' 
+                              ? aiResponse.answer.split('\n').map((line, lineIndex) => (
+                                  <div key={lineIndex}>
+                                    {line.split(/(\*\*.*?\*\*)/).map((part, partIndex) => {
+                                      if (part.startsWith('**') && part.endsWith('**')) {
+                                        return (
+                                          <span key={partIndex} className="font-semibold text-gray-900 bg-yellow-100 px-1 rounded">
+                                            {part.slice(2, -2)}
+                                          </span>
+                                        );
+                                      }
+                                      return <span key={partIndex}>{part}</span>;
+                                    })}
+                                  </div>
+                                ))
+                              : <pre className="text-xs bg-gray-50 p-2 rounded overflow-auto">
+                                  {JSON.stringify(aiResponse.answer, null, 2)}
+                                </pre>
+                            }
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+              
+              {!aiResponse && (
+                <div className="p-4 text-center text-gray-500">
+                  <MessageSquare className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+                  <p className="text-sm">Ask AI a question to see analysis here</p>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       </div>
 
@@ -685,20 +700,20 @@ function App() {
       {showMeetingModal && selectedUser && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[80vh] overflow-hidden">
-            <div className="bg-slate-50 px-6 py-4 border-b border-slate-200">
+            <div className="bg-gray-50 px-6 py-4 border-b border-gray-200">
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="text-lg font-semibold text-slate-900">
+                  <h3 className="text-lg font-semibold text-gray-900">
                     Meeting Details - {selectedUser.userName}
                   </h3>
-                  <div className="text-sm text-slate-600 mt-1 space-y-1">
+                  <div className="text-sm text-gray-600 mt-1 space-y-1">
                     <p>{selectedUser.values.Meeting} meeting{selectedUser.values.Meeting !== 1 ? 's' : ''} found</p>
                     {selectedUser.meetingCounts && (
                       <div className="flex gap-4 text-xs">
-                        <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full">
+                        <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full border border-blue-200">
                           Trellus: {selectedUser.meetingCounts.trellus}
                         </span>
-                        <span className="bg-green-100 text-green-800 px-2 py-1 rounded-full">
+                        <span className="bg-green-100 text-green-800 px-2 py-1 rounded-full border border-green-200">
                           Manual Entry: {selectedUser.meetingCounts.googleSheet}
                         </span>
                       </div>
@@ -707,11 +722,9 @@ function App() {
                 </div>
                 <button
                   onClick={() => setShowMeetingModal(false)}
-                  className="text-slate-400 hover:text-slate-600 transition-colors"
+                  className="text-gray-400 hover:text-gray-600 transition-colors"
                 >
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
+                  <X className="w-6 h-6" />
                 </button>
               </div>
             </div>
@@ -720,47 +733,34 @@ function App() {
               {selectedUser.meetingTimestamps && selectedUser.meetingTimestamps.length > 0 ? (
                 <div className="space-y-4">
                   {selectedUser.meetingTimestamps.map((meeting, index) => (
-                    <div key={index} className="bg-slate-50 rounded-lg p-4 border border-slate-200">
+                    <div key={index} className="bg-gray-50 rounded-lg p-4 border border-gray-200">
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                          <div className="text-sm font-medium text-slate-700 mb-1">Meeting Date</div>
-                          <div className="text-sm text-slate-900 font-semibold">
+                          <div className="text-sm font-medium text-gray-700 mb-1">Meeting Date</div>
+                          <div className="text-sm text-gray-900 font-semibold">
                             {formatTimestamp(meeting.timestamp)}
                           </div>
                         </div>
                         
                         <div>
-                          <div className="text-sm font-medium text-slate-700 mb-1">Current Stage</div>
-                          <div className="text-sm text-slate-900">
+                          <div className="text-sm font-medium text-gray-700 mb-1">Current Stage</div>
+                          <div className="text-sm text-gray-900">
                             {meeting.currentStage || 'N/A'}
                           </div>
                         </div>
                         
-                        <div>
-                          <div className="text-sm font-medium text-slate-700 mb-1">Lead Contact</div>
-                          <div className="text-sm text-slate-900">
-                            {meeting.leadName || 'N/A'}
-                          </div>
-                        </div>
                         
                         <div>
-                          <div className="text-sm font-medium text-slate-700 mb-1">Company</div>
-                          <div className="text-sm text-slate-900">
-                            {meeting.companyName || 'N/A'}
-                          </div>
-                        </div>
-                        
-                        <div>
-                          <div className="text-sm font-medium text-slate-700 mb-1">Source of Lead</div>
-                          <div className="text-sm text-slate-900">
+                          <div className="text-sm font-medium text-gray-700 mb-1">Source of Lead</div>
+                          <div className="text-sm text-gray-900">
                             {meeting.sourceOfLead || 'N/A'}
                           </div>
                         </div>
                         
                         {meeting.meetingBookedDate && (
                           <div>
-                            <div className="text-sm font-medium text-slate-700 mb-1">Meeting Booked Date</div>
-                            <div className="text-sm text-slate-900">
+                            <div className="text-sm font-medium text-gray-700 mb-1">Meeting Booked Date</div>
+                            <div className="text-sm text-gray-900">
                               {meeting.meetingBookedDate}
                             </div>
                           </div>
@@ -771,17 +771,17 @@ function App() {
                 </div>
               ) : (
                 <div className="text-center py-8">
-                  <div className="text-slate-500 text-sm">
+                  <div className="text-gray-500 text-sm">
                     No meeting details available for this user.
                   </div>
                 </div>
               )}
             </div>
             
-            <div className="bg-slate-50 px-6 py-4 border-t border-slate-200">
+            <div className="bg-gray-50 px-6 py-4 border-t border-gray-200">
               <button
                 onClick={() => setShowMeetingModal(false)}
-                className="w-full px-4 py-2 bg-slate-800 text-white text-sm font-medium rounded-md hover:bg-slate-700 transition-colors"
+                className="w-full px-4 py-2 bg-gray-800 text-white text-sm font-medium rounded-md hover:bg-gray-700 transition-colors"
               >
                 Close
               </button>
